@@ -1,0 +1,9 @@
+﻿namespace ProjectPulse;
+
+public partial class AppShell : Shell
+{
+	public AppShell()
+	{
+		InitializeComponent();
+	}
+}
