@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="ProjectPulse.Views.RegisterPage"
+             xmlns:viewmodel="clr-namespace:ProjectPulse.ViewModels"
+             x:DataType="viewmodel:RegisterViewModel"
+             Shell.NavBarIsVisible="False"
+             BackgroundColor="#f8f9fa">
+
+    <ScrollView>
+        <Grid RowDefinitions="150, Auto, *"
+              RowSpacing="10"
+              Padding="20">
+
+            <Image Grid.Row="0"
+                   Source="dotnet_bot.png"
+                   HeightRequest="100"
+                   HorizontalOptions="Center"
+                   VerticalOptions="Center" />
+
+            <VerticalStackLayout Grid.Row="1" 
+                                 Spacing="15"
+                                 WidthRequest="300">
+                
+                <Label Text="Регистрация в Пульс Проекта"
+                       HorizontalOptions="Center"
+                       FontSize="22"
+                       FontAttributes="Bold"
+                       TextColor="#dc3545" />
+
+                <Border Stroke="#e9ecef"
+                        StrokeThickness="1"
+                        BackgroundColor="White"
+                        StrokeShape="RoundRectangle 10,10,10,10">
+                    <VerticalStackLayout Padding="15" Spacing="15">
+                        <Entry Placeholder="Имя пользователя"
+                               Text="{Binding Username}"
+                               ReturnType="Next" />
+                        
+                        <Entry Placeholder="Email"
+                               Text="{Binding Email}"
+                               Keyboard="Email"
+                               ReturnType="Next" />
+                               
+                        <Entry Placeholder="Имя"
+                               Text="{Binding FirstName}"
+                               ReturnType="Next" />
+                               
+                        <Entry Placeholder="Фамилия"
+                               Text="{Binding LastName}"
+                               ReturnType="Next" />
+                        
+                        <Entry Placeholder="Пароль"
+                               Text="{Binding Password}"
+                               IsPassword="True"
+                               ReturnType="Next" />
+                               
+                        <Entry Placeholder="Подтвердите пароль"
+                               Text="{Binding ConfirmPassword}"
+                               IsPassword="True"
+                               ReturnType="Done"
+                               ReturnCommand="{Binding RegisterCommand}" />
+                        
+                        <Grid ColumnDefinitions="*, Auto">
+                            <CheckBox IsChecked="{Binding UseBiometricAuth}"
+                                      Color="#dc3545" />
+                            <Label Text="Использовать биометрию для входа"
+                                   Grid.Column="1"
+                                   VerticalOptions="Center" />
+                        </Grid>
+                        
+                        <Button Text="Зарегистрироваться"
+                                Command="{Binding RegisterCommand}"
+                                BackgroundColor="#dc3545"
+                                TextColor="White"
+                                CornerRadius="5"
+                                HeightRequest="50" />
+                    </VerticalStackLayout>
+                </Border>
+                
+                <Label Text="{Binding ErrorMessage}"
+                       TextColor="#dc3545"
+                       IsVisible="{Binding HasError}"
+                       HorizontalOptions="Center" />
+                
+                <Button Text="Вернуться к входу"
+                        Command="{Binding BackCommand}"
+                        BackgroundColor="Transparent"
+                        TextColor="#212529"
+                        CornerRadius="5" />
+                
+                <ActivityIndicator IsRunning="{Binding IsBusy}"
+                                   IsVisible="{Binding IsBusy}"
+                                   HorizontalOptions="Center"
+                                   Color="#dc3545" />
+            </VerticalStackLayout>
+        </Grid>
+    </ScrollView>
+</ContentPage>

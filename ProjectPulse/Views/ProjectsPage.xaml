@@ -1,0 +1,256 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="ProjectPulse.Views.ProjectsPage"
+             xmlns:viewmodel="clr-namespace:ProjectPulse.ViewModels"
+             xmlns:model="clr-namespace:ProjectPulse.Models"
+             x:DataType="viewmodel:ProjectsViewModel"
+             Title="{Binding Title}">
+
+    <Grid RowDefinitions="Auto, *">
+        <!-- Search and Filter Bar -->
+        <Grid ColumnDefinitions="*, Auto" Padding="15,10">
+            <SearchBar Placeholder="Поиск проектов"
+                       Text="{Binding SearchText}"
+                       SearchCommand="{Binding ApplySearchFilterCommand}"
+                       HorizontalOptions="FillAndExpand"
+                       CancelButtonColor="{StaticResource PrimaryColor}" />
+            
+            <Button Grid.Column="1"
+                    Command="{Binding ToggleFilterOptionsCommand}"
+                    BackgroundColor="Transparent"
+                    WidthRequest="50"
+                    HeightRequest="50"
+                    HorizontalOptions="End">
+                <Button.ImageSource>
+                    <FontImageSource Glyph="&#xE152;"
+                                    FontFamily="MaterialIcons"
+                                    Color="#dc3545"
+                                    Size="24" />
+                </Button.ImageSource>
+            </Button>
+        </Grid>
+        
+        <!-- Filter Options Panel (Collapsible) -->
+        <Border Grid.Row="0"
+                Margin="15,55,15,0"
+                Padding="15"
+                Style="{StaticResource CardBorder}"
+                IsVisible="{Binding IsFiltering}"
+                ZIndex="1">
+            <VerticalStackLayout Spacing="10">
+                <Label Text="Фильтр проектов"
+                       FontAttributes="Bold"
+                       FontSize="16" />
+                
+                <Grid ColumnDefinitions="*, Auto">
+                    <Label Text="Активные проекты"
+                           VerticalOptions="Center" />
+                    <CheckBox Grid.Column="1"
+                              IsChecked="{Binding ShowActive}"
+                              Color="{StaticResource PrimaryColor}" />
+                </Grid>
+                
+                <Grid ColumnDefinitions="*, Auto">
+                    <Label Text="Завершённые проекты"
+                           VerticalOptions="Center" />
+                    <CheckBox Grid.Column="1"
+                              IsChecked="{Binding ShowCompleted}"
+                              Color="{StaticResource PrimaryColor}" />
+                </Grid>
+                
+                <Grid ColumnDefinitions="*, Auto">
+                    <Label Text="Архивные проекты"
+                           VerticalOptions="Center" />
+                    <CheckBox Grid.Column="1"
+                              IsChecked="{Binding ShowArchived}"
+                              Color="{StaticResource PrimaryColor}" />
+                </Grid>
+                
+                <Button Text="Применить фильтры"
+                        Command="{Binding ApplyFiltersCommand}"
+                        Style="{StaticResource PrimaryButton}" />
+            </VerticalStackLayout>
+        </Border>
+        
+        <!-- Main Content -->
+        <RefreshView Grid.Row="1" 
+                     IsRefreshing="{Binding IsRefreshing}" 
+                     Command="{Binding RefreshCommand}">
+            <ScrollView>
+                <VerticalStackLayout Spacing="15" Padding="15">
+                    
+                    <!-- Create Project Button -->
+                    <Button Text="Создать новый проект"
+                            Command="{Binding CreateProjectCommand}"
+                            Style="{StaticResource PrimaryButton}"
+                            HorizontalOptions="Center" />
+                    
+                    <!-- Active Projects Section -->
+                    <VerticalStackLayout IsVisible="{Binding ShowActive}">
+                        <Label Text="Активные проекты"
+                               Style="{StaticResource HeaderLabel}" />
+                        
+                        <Border Style="{StaticResource CardBorder}"
+                                IsVisible="{Binding HasActiveProjects}">
+                            <CollectionView ItemsSource="{Binding ActiveProjects}"
+                                            SelectionMode="Single"
+                                            SelectionChangedCommand="{Binding ViewProjectDetailsCommand}"
+                                            SelectionChangedCommandParameter="{Binding SelectedItem, Source={RelativeSource Self}}">
+                                <CollectionView.ItemTemplate>
+                                    <DataTemplate x:DataType="model:Project">
+                                        <Grid Padding="15,10" RowDefinitions="Auto, Auto" ColumnDefinitions="*, Auto">
+                                            <Label Text="{Binding Name}"
+                                                   FontAttributes="Bold"
+                                                   FontSize="16" />
+                                            
+                                            <Label Grid.Column="1"
+                                                   Text="{Binding Status}"
+                                                   TextColor="{Binding Status, Converter={StaticResource StatusToColorConverter}}"
+                                                   FontSize="12" />
+                                            
+                                            <VerticalStackLayout Grid.Row="1" Grid.ColumnSpan="2" Spacing="5">
+                                                <Grid ColumnDefinitions="*, Auto" Margin="0,5,0,0">
+                                                    <ProgressBar Progress="{Binding CompletionPercentage, Converter={StaticResource PercentageToDecimalConverter}}"
+                                                                 ProgressColor="{StaticResource SuccessColor}"
+                                                                 HeightRequest="10" />
+                                                    <Label Grid.Column="1"
+                                                           Text="{Binding CompletionPercentage, StringFormat='{0:F0}%'}"
+                                                           FontSize="12"
+                                                           TextColor="{StaticResource SecondaryTextColor}" />
+                                                </Grid>
+                                                
+                                                <Grid ColumnDefinitions="Auto, *" Margin="0,5,0,0">
+                                                    <Label Text="{Binding DueDate, StringFormat='Срок: {0:d MMMM}'}"
+                                                           FontSize="12"
+                                                           TextColor="{StaticResource SecondaryTextColor}" />
+                                                    
+                                                    <Label Grid.Column="1"
+                                                           Text="{Binding TeamMembers.Count, StringFormat='Участников: {0}'}"
+                                                           FontSize="12"
+                                                           TextColor="{StaticResource SecondaryTextColor}"
+                                                           HorizontalOptions="End" />
+                                                </Grid>
+                                            </VerticalStackLayout>
+                                        </Grid>
+                                    </DataTemplate>
+                                </CollectionView.ItemTemplate>
+                            </CollectionView>
+                        </Border>
+                        
+                        <Label Text="У вас нет активных проектов" 
+                               IsVisible="{Binding HasActiveProjects, Converter={StaticResource InverseBoolConverter}}"
+                               HorizontalOptions="Center"
+                               TextColor="{StaticResource SecondaryTextColor}"
+                               Margin="0,10,0,10" />
+                    </VerticalStackLayout>
+                    
+                    <!-- Completed Projects Section -->
+                    <VerticalStackLayout IsVisible="{Binding ShowCompleted}">
+                        <Label Text="Завершённые проекты"
+                               Style="{StaticResource HeaderLabel}" />
+                        
+                        <Border Style="{StaticResource CardBorder}"
+                                IsVisible="{Binding HasCompletedProjects}">
+                            <CollectionView ItemsSource="{Binding CompletedProjects}"
+                                            SelectionMode="Single"
+                                            SelectionChangedCommand="{Binding ViewProjectDetailsCommand}"
+                                            SelectionChangedCommandParameter="{Binding SelectedItem, Source={RelativeSource Self}}">
+                                <CollectionView.EmptyView>
+                                    <Label Text="У вас нет завершённых проектов"
+                                           HorizontalOptions="Center"
+                                           VerticalOptions="Center"
+                                           TextColor="{StaticResource SecondaryTextColor}" />
+                                </CollectionView.EmptyView>
+                                <CollectionView.ItemTemplate>
+                                    <DataTemplate x:DataType="model:Project">
+                                        <Grid Padding="15,10" RowDefinitions="Auto, Auto" ColumnDefinitions="*, Auto">
+                                            <Label Text="{Binding Name}"
+                                                   FontAttributes="Bold"
+                                                   FontSize="16" />
+                                            
+                                            <Label Grid.Column="1"
+                                                   Text="{Binding Status}"
+                                                   TextColor="{StaticResource SuccessColor}"
+                                                   FontSize="12" />
+                                            
+                                            <Label Grid.Row="1" Grid.ColumnSpan="2"
+                                                   Text="{Binding CompletedDate, StringFormat='Завершено: {0:d MMMM}'}"
+                                                   FontSize="12"
+                                                   TextColor="{StaticResource SecondaryTextColor}" />
+                                        </Grid>
+                                    </DataTemplate>
+                                </CollectionView.ItemTemplate>
+                            </CollectionView>
+                        </Border>
+                        
+                        <Label Text="У вас нет завершённых проектов" 
+                               IsVisible="{Binding HasCompletedProjects, Converter={StaticResource InverseBoolConverter}}"
+                               HorizontalOptions="Center"
+                               TextColor="{StaticResource SecondaryTextColor}"
+                               Margin="0,10,0,10" />
+                    </VerticalStackLayout>
+                    
+                    <!-- Archived Projects Section -->
+                    <VerticalStackLayout IsVisible="{Binding ShowArchived}">
+                        <Label Text="Архивные проекты"
+                               Style="{StaticResource HeaderLabel}" />
+                        
+                        <Border Style="{StaticResource CardBorder}"
+                                IsVisible="{Binding HasArchivedProjects}">
+                            <CollectionView ItemsSource="{Binding ArchivedProjects}"
+                                            SelectionMode="Single"
+                                            SelectionChangedCommand="{Binding ViewProjectDetailsCommand}"
+                                            SelectionChangedCommandParameter="{Binding SelectedItem, Source={RelativeSource Self}}">
+                                <CollectionView.EmptyView>
+                                    <Label Text="У вас нет архивных проектов"
+                                           HorizontalOptions="Center"
+                                           VerticalOptions="Center"
+                                           TextColor="{StaticResource SecondaryTextColor}" />
+                                </CollectionView.EmptyView>
+                                <CollectionView.ItemTemplate>
+                                    <DataTemplate x:DataType="model:Project">
+                                        <Grid Padding="15,10" RowDefinitions="Auto, Auto" ColumnDefinitions="*, Auto">
+                                            <Label Text="{Binding Name}"
+                                                   FontAttributes="Bold"
+                                                   FontSize="16" />
+                                            
+                                            <Label Grid.Column="1"
+                                                   Text="{Binding Status}"
+                                                   TextColor="{StaticResource SecondaryTextColor}"
+                                                   FontSize="12" />
+                                            
+                                            <Label Grid.Row="1" Grid.ColumnSpan="2"
+                                                   Text="{Binding ModifiedAt, StringFormat='Обновлено: {0:d MMMM}'}"
+                                                   FontSize="12"
+                                                   TextColor="{StaticResource SecondaryTextColor}" />
+                                        </Grid>
+                                    </DataTemplate>
+                                </CollectionView.ItemTemplate>
+                            </CollectionView>
+                        </Border>
+                        
+                        <Label Text="У вас нет архивных проектов" 
+                               IsVisible="{Binding HasArchivedProjects, Converter={StaticResource InverseBoolConverter}}"
+                               HorizontalOptions="Center"
+                               TextColor="{StaticResource SecondaryTextColor}"
+                               Margin="0,10,0,10" />
+                    </VerticalStackLayout>
+                    
+                    <!-- Loading indicator -->
+                    <ActivityIndicator IsRunning="{Binding IsBusy}"
+                                       IsVisible="{Binding IsBusy}"
+                                       HorizontalOptions="Center"
+                                       VerticalOptions="Center"
+                                       Color="{StaticResource PrimaryColor}" />
+                    
+                    <!-- Error message -->
+                    <Label Text="{Binding ErrorMessage}"
+                           TextColor="{StaticResource DangerColor}"
+                           IsVisible="{Binding HasError}"
+                           HorizontalOptions="Center" />
+                </VerticalStackLayout>
+            </ScrollView>
+        </RefreshView>
+    </Grid>
+</ContentPage>

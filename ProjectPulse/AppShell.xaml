@@ -3,13 +3,54 @@
     x:Class="ProjectPulse.AppShell"
     xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
-    xmlns:local="clr-namespace:ProjectPulse"
-    Shell.FlyoutBehavior="Flyout"
-    Title="ProjectPulse">
-
+    xmlns:views="clr-namespace:ProjectPulse.Views"
+    Shell.BackgroundColor="#dc3545"
+    Shell.ForegroundColor="White"
+    Shell.TitleColor="White"
+    Shell.TabBarBackgroundColor="#dc3545">
+    
+    <!-- Login and Registration (unregistered user flow) -->
     <ShellContent
-        Title="Home"
-        ContentTemplate="{DataTemplate local:MainPage}"
-        Route="MainPage" />
-
+        Route="LoginPage"
+        ContentTemplate="{DataTemplate views:LoginPage}"
+        FlyoutItemIsVisible="False" />
+    
+    <ShellContent
+        Route="RegisterPage"
+        ContentTemplate="{DataTemplate views:RegisterPage}"
+        FlyoutItemIsVisible="False" />
+    
+    <!-- Tabbed Main Application (registered user flow) -->
+    <TabBar Route="MainApp">
+        <Tab Title="Дашборд" Icon="dashboard_icon.png">
+            <ShellContent
+                Route="DashboardPage"
+                ContentTemplate="{DataTemplate views:DashboardPage}" />
+        </Tab>
+        
+        <Tab Title="Проекты" Icon="projects_icon.png">
+            <ShellContent
+                Route="ProjectsPage"
+                ContentTemplate="{DataTemplate views:ProjectsPage}" />
+        </Tab>
+        
+        <Tab Title="Задачи" Icon="tasks_icon.png">
+            <ShellContent
+                Route="TasksPage"
+                ContentTemplate="{DataTemplate views:TasksPage}" />
+        </Tab>
+        
+        <Tab Title="Календарь" Icon="calendar_icon.png">
+            <ShellContent
+                Route="CalendarPage"
+                ContentTemplate="{DataTemplate views:CalendarPage}" />
+        </Tab>
+        
+        <Tab Title="Профиль" Icon="profile_icon.png">
+            <ShellContent
+                Route="ProfilePage"
+                ContentTemplate="{DataTemplate views:ProfilePage}" />
+        </Tab>
+    </TabBar>
+    
 </Shell>

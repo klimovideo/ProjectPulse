@@ -1,0 +1,293 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="ProjectPulse.Views.DashboardPage"
+             xmlns:viewmodel="clr-namespace:ProjectPulse.ViewModels"
+             xmlns:model="clr-namespace:ProjectPulse.Models"
+             x:DataType="viewmodel:DashboardViewModel"
+             Title="{Binding Title}">
+
+    <Grid RowDefinitions="Auto, *">
+        <!-- Header section with notification badge -->
+        <Grid ColumnDefinitions="*, Auto" Padding="15,10">
+            <Label Text="{Binding WelcomeMessage}" 
+                   FontSize="20" 
+                   FontAttributes="Bold"
+                   VerticalOptions="Center" />
+            
+            <Button Grid.Column="1"
+                    Command="{Binding ViewNotificationsCommand}"
+                    BackgroundColor="Transparent"
+                    WidthRequest="50"
+                    HeightRequest="50"
+                    HorizontalOptions="End">
+                <Button.ImageSource>
+                    <FontImageSource Glyph="&#xE7F4;"
+                                    FontFamily="MaterialIcons"
+                                    Color="#dc3545"
+                                    Size="24" />
+                </Button.ImageSource>
+            </Button>
+            
+            <Border Grid.Column="1"
+                    WidthRequest="20"
+                    HeightRequest="20"
+                    BackgroundColor="#dc3545"
+                    StrokeShape="RoundRectangle 10,10,10,10"
+                    HorizontalOptions="End"
+                    VerticalOptions="Start"
+                    Margin="0,0,5,0"
+                    IsVisible="{Binding UnreadNotifications, Converter={StaticResource GreaterThanZeroConverter}}">
+                <Label Text="{Binding UnreadNotifications}"
+                       TextColor="White"
+                       FontSize="12"
+                       FontAttributes="Bold"
+                       HorizontalOptions="Center"
+                       VerticalOptions="Center" />
+            </Border>
+        </Grid>
+        
+        <!-- Main content -->
+        <RefreshView Grid.Row="1" 
+                     IsRefreshing="{Binding IsRefreshing}" 
+                     Command="{Binding RefreshCommand}">
+            <ScrollView>
+                <VerticalStackLayout Spacing="15" Padding="15">
+                    
+                    <!-- AI Recommendation -->
+                    <Border Stroke="#e9ecef"
+                            StrokeThickness="1"
+                            BackgroundColor="#f8d7da"
+                            StrokeShape="RoundRectangle 10,10,10,10"
+                            Padding="15">
+                        <VerticalStackLayout Spacing="5">
+                            <Grid ColumnDefinitions="Auto, *">
+                                <Image Source="ai_icon.png"
+                                       WidthRequest="30"
+                                       HeightRequest="30" />
+                                <Label Grid.Column="1"
+                                       Text="ИИ рекомендует:"
+                                       FontAttributes="Bold"
+                                       FontSize="16"
+                                       VerticalOptions="Center"
+                                       TextColor="#721c24" />
+                            </Grid>
+                            <Label Text="{Binding AiRecommendation}"
+                                   TextColor="#721c24"
+                                   FontSize="14" />
+                        </VerticalStackLayout>
+                    </Border>
+                    
+                    <!-- Quick Actions -->
+                    <Label Text="Быстрые действия"
+                           FontSize="18"
+                           FontAttributes="Bold"
+                           Margin="0,10,0,5" />
+                    
+                    <Grid ColumnDefinitions="*, *" ColumnSpacing="10">
+                        <Button Text="Новый проект"
+                                Command="{Binding CreateNewProjectCommand}"
+                                BackgroundColor="#dc3545"
+                                TextColor="White"
+                                BorderColor="#dc3545"
+                                CornerRadius="5" />
+                        
+                        <Button Grid.Column="1"
+                                Text="Новая задача"
+                                Command="{Binding CreateNewTaskCommand}"
+                                BackgroundColor="#f8f9fa"
+                                TextColor="#dc3545"
+                                BorderColor="#dc3545"
+                                BorderWidth="1"
+                                CornerRadius="5" />
+                    </Grid>
+                    
+                    <!-- Completion Rate -->
+                    <Label Text="Ваш прогресс"
+                           FontSize="18"
+                           FontAttributes="Bold"
+                           Margin="0,10,0,5" />
+                    
+                    <Border Stroke="#e9ecef"
+                            StrokeThickness="1"
+                            BackgroundColor="White"
+                            StrokeShape="RoundRectangle 10,10,10,10"
+                            Padding="15">
+                        <VerticalStackLayout Spacing="10">
+                            <Label Text="{Binding CompletionRate, StringFormat='{0:F1}% задач выполнено'}"
+                                   FontSize="16" />
+                            <ProgressBar Progress="{Binding CompletionRate, Converter={StaticResource PercentageToDecimalConverter}}"
+                                         ProgressColor="#28a745"
+                                         HeightRequest="15" />
+                        </VerticalStackLayout>
+                    </Border>
+                    
+                    <!-- Upcoming Tasks -->
+                    <Label Text="Предстоящие задачи"
+                           FontSize="18"
+                           FontAttributes="Bold"
+                           Margin="0,10,0,5" />
+                    
+                    <Border Stroke="#e9ecef"
+                            StrokeThickness="1"
+                            BackgroundColor="White"
+                            StrokeShape="RoundRectangle 10,10,10,10"
+                            IsVisible="{Binding HasUpcomingTasks}">
+                        <CollectionView ItemsSource="{Binding UpcomingTasks}"
+                                        SelectionMode="Single"
+                                        SelectionChangedCommand="{Binding ViewTaskDetailsCommand}"
+                                        SelectionChangedCommandParameter="{Binding SelectedItem, Source={RelativeSource Self}}"
+                                        EmptyView="Нет предстоящих задач"
+                                        HeightRequest="200">
+                            <CollectionView.ItemTemplate>
+                                <DataTemplate x:DataType="model:Task">
+                                    <Grid Padding="15,10" ColumnDefinitions="Auto, *, Auto">
+                                        <Border WidthRequest="5"
+                                                HeightRequest="30"
+                                                BackgroundColor="{Binding TaskPulseColor}"
+                                                StrokeShape="RoundRectangle 5,5,5,5" />
+                                        
+                                        <VerticalStackLayout Grid.Column="1" Spacing="5">
+                                            <Label Text="{Binding Title}"
+                                                   FontAttributes="Bold" />
+                                            <Label Text="{Binding DueDate, StringFormat='Срок: {0:d MMMM}'}"
+                                                   FontSize="12"
+                                                   TextColor="#6c757d" />
+                                        </VerticalStackLayout>
+                                        
+                                        <Label Grid.Column="2"
+                                               Text="{Binding Priority}"
+                                               FontSize="12"
+                                               VerticalOptions="Center" />
+                                    </Grid>
+                                </DataTemplate>
+                            </CollectionView.ItemTemplate>
+                        </CollectionView>
+                    </Border>
+                    
+                    <Label Text="У вас нет предстоящих задач" 
+                           IsVisible="{Binding HasUpcomingTasks, Converter={StaticResource InverseBoolConverter}}"
+                           HorizontalOptions="Center"
+                           TextColor="#6c757d" />
+                    
+                    <!-- Overdue Tasks -->
+                    <Label Text="Просроченные задачи"
+                           FontSize="18"
+                           FontAttributes="Bold"
+                           Margin="0,10,0,5"
+                           IsVisible="{Binding HasOverdueTasks}" />
+                    
+                    <Border Stroke="#e9ecef"
+                            StrokeThickness="1"
+                            BackgroundColor="#fff3cd"
+                            StrokeShape="RoundRectangle 10,10,10,10"
+                            IsVisible="{Binding HasOverdueTasks}">
+                        <CollectionView ItemsSource="{Binding OverdueTasks}"
+                                        SelectionMode="Single"
+                                        SelectionChangedCommand="{Binding ViewTaskDetailsCommand}"
+                                        SelectionChangedCommandParameter="{Binding SelectedItem, Source={RelativeSource Self}}"
+                                        EmptyView="Нет просроченных задач">
+                            <CollectionView.ItemTemplate>
+                                <DataTemplate x:DataType="model:Task">
+                                    <Grid Padding="15,10" ColumnDefinitions="Auto, *, Auto">
+                                        <Border WidthRequest="5"
+                                                HeightRequest="30"
+                                                BackgroundColor="#dc3545"
+                                                StrokeShape="RoundRectangle 5,5,5,5" />
+                                        
+                                        <VerticalStackLayout Grid.Column="1" Spacing="5">
+                                            <Label Text="{Binding Title}"
+                                                   FontAttributes="Bold"
+                                                   TextColor="#721c24" />
+                                            <Label Text="{Binding DueDate, StringFormat='Просрочено на {0} дней'}"
+                                                   FontSize="12"
+                                                   TextColor="#721c24" />
+                                        </VerticalStackLayout>
+                                        
+                                        <Label Grid.Column="2"
+                                               Text="{Binding Priority}"
+                                               FontSize="12"
+                                               TextColor="#721c24"
+                                               VerticalOptions="Center" />
+                                    </Grid>
+                                </DataTemplate>
+                            </CollectionView.ItemTemplate>
+                        </CollectionView>
+                    </Border>
+                    
+                    <!-- Recent Projects -->
+                    <Label Text="Последние проекты"
+                           FontSize="18"
+                           FontAttributes="Bold"
+                           Margin="0,10,0,5" />
+                    
+                    <Border Stroke="#e9ecef"
+                            StrokeThickness="1"
+                            BackgroundColor="White"
+                            StrokeShape="RoundRectangle 10,10,10,10"
+                            IsVisible="{Binding HasRecentProjects}">
+                        <CollectionView ItemsSource="{Binding RecentProjects}"
+                                        SelectionMode="Single"
+                                        SelectionChangedCommand="{Binding ViewProjectDetailsCommand}"
+                                        SelectionChangedCommandParameter="{Binding SelectedItem, Source={RelativeSource Self}}"
+                                        EmptyView="Нет недавних проектов">
+                            <CollectionView.ItemTemplate>
+                                <DataTemplate x:DataType="model:Project">
+                                    <Grid Padding="15,10" ColumnDefinitions="*, Auto">
+                                        <VerticalStackLayout Spacing="5">
+                                            <Label Text="{Binding Name}"
+                                                   FontAttributes="Bold" />
+                                            <Grid ColumnDefinitions="*, Auto">
+                                                <ProgressBar Progress="{Binding CompletionPercentage, Converter={StaticResource PercentageToDecimalConverter}}"
+                                                             ProgressColor="#28a745"
+                                                             HeightRequest="10" />
+                                                <Label Grid.Column="1"
+                                                       Text="{Binding CompletionPercentage, StringFormat='{0:F0}%'}"
+                                                       FontSize="12"
+                                                       TextColor="#6c757d" />
+                                            </Grid>
+                                        </VerticalStackLayout>
+                                        
+                                        <Label Grid.Column="1"
+                                               Text="{Binding Status}"
+                                               FontSize="12"
+                                               VerticalOptions="Center" />
+                                    </Grid>
+                                </DataTemplate>
+                            </CollectionView.ItemTemplate>
+                        </CollectionView>
+                    </Border>
+                    
+                    <Label Text="У вас нет проектов. Создайте новый проект!" 
+                           IsVisible="{Binding HasRecentProjects, Converter={StaticResource InverseBoolConverter}}"
+                           HorizontalOptions="Center"
+                           TextColor="#6c757d" />
+                    
+                    <!-- Team Pulse Survey Reminder -->
+                    <Border Stroke="#e9ecef"
+                            StrokeThickness="1"
+                            BackgroundColor="#d1ecf1"
+                            StrokeShape="RoundRectangle 10,10,10,10"
+                            Padding="15"
+                            Margin="0,10,0,10">
+                        <VerticalStackLayout Spacing="10">
+                            <Label Text="Пульс команды"
+                                   FontAttributes="Bold"
+                                   FontSize="16"
+                                   TextColor="#0c5460" />
+                            <Label Text="Как вы себя чувствуете сегодня? Пройдите короткий опрос настроения команды."
+                                   TextColor="#0c5460"
+                                   FontSize="14" />
+                            <Button Text="Пройти опрос"
+                                    BackgroundColor="#17a2b8"
+                                    TextColor="White"
+                                    CornerRadius="5"
+                                    HorizontalOptions="Start" />
+                        </VerticalStackLayout>
+                    </Border>
+                    
+                </VerticalStackLayout>
+            </ScrollView>
+        </RefreshView>
+    </Grid>
+</ContentPage>

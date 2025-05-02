@@ -10,14 +10,8 @@
             "name": ".NET MAUI",
             "type": "maui",
             "request": "launch",
-            "preLaunchTask": "maui: Build"
+            "preLaunchTask": "maui: Build",
+            "targetFramework": "net8.0-maccatalyst"
         },
-
-        {
-            "name": ".NET MAUI",
-            "type": "maui",
-            "request": "launch",
-            "preLaunchTask": "maui: Build"
-        }
     ]
 }

@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="ProjectPulse.Views.LoginPage"
+             xmlns:viewmodel="clr-namespace:ProjectPulse.ViewModels"
+             x:DataType="viewmodel:LoginViewModel"
+             Shell.NavBarIsVisible="False"
+             BackgroundColor="#f8f9fa">
+
+    <Grid RowDefinitions="200, Auto, *"
+          RowSpacing="10"
+          Padding="20">
+
+        <Image Grid.Row="0"
+               Source="dotnet_bot.png"
+               HeightRequest="150"
+               HorizontalOptions="Center"
+               VerticalOptions="Center" />
+
+        <VerticalStackLayout Grid.Row="1" 
+                             Spacing="15"
+                             WidthRequest="300">
+            
+            <Label Text="Вход в Пульс Проекта"
+                   HorizontalOptions="Center"
+                   FontSize="22"
+                   FontAttributes="Bold"
+                   TextColor="#dc3545" />
+
+            <Border Stroke="#e9ecef"
+                    StrokeThickness="1"
+                    BackgroundColor="White"
+                    StrokeShape="RoundRectangle 10,10,10,10">
+                <VerticalStackLayout Padding="15" Spacing="15">
+                    <Entry Placeholder="Имя пользователя"
+                           Text="{Binding Username}"
+                           ReturnType="Next" />
+                    
+                    <Entry Placeholder="Пароль"
+                           Text="{Binding Password}"
+                           IsPassword="True"
+                           ReturnType="Done"
+                           ReturnCommand="{Binding LoginCommand}" />
+                    
+                    <Grid ColumnDefinitions="*, Auto">
+                        <CheckBox IsChecked="{Binding RememberMe}"
+                                  Color="#dc3545" />
+                        <Label Text="Запомнить меня"
+                               Grid.Column="1"
+                               VerticalOptions="Center" />
+                    </Grid>
+                    
+                    <Button Text="Войти"
+                            Command="{Binding LoginCommand}"
+                            BackgroundColor="#dc3545"
+                            TextColor="White"
+                            CornerRadius="5"
+                            HeightRequest="50" />
+
+                    <Button Text="Войти с помощью биометрии"
+                            Command="{Binding LoginWithBiometricCommand}"
+                            BackgroundColor="#f8f9fa"
+                            TextColor="#dc3545"
+                            BorderColor="#dc3545"
+                            BorderWidth="1"
+                            CornerRadius="5"
+                            HeightRequest="50"
+                            IsVisible="{Binding BiometricAvailable}" />
+                </VerticalStackLayout>
+            </Border>
+            
+            <Label Text="{Binding ErrorMessage}"
+                   TextColor="#dc3545"
+                   IsVisible="{Binding HasError}"
+                   HorizontalOptions="Center" />
+            
+            <Label Text="Нет учетной записи?"
+                   HorizontalOptions="Center"
+                   Margin="0,20,0,0" />
+            
+            <Button Text="Зарегистрироваться"
+                    Command="{Binding RegisterCommand}"
+                    BackgroundColor="Transparent"
+                    TextColor="#dc3545"
+                    FontAttributes="Bold"
+                    CornerRadius="5" />
+            
+            <ActivityIndicator IsRunning="{Binding IsBusy}"
+                               IsVisible="{Binding IsBusy}"
+                               HorizontalOptions="Center"
+                               Color="#dc3545" />
+        </VerticalStackLayout>
+    </Grid>
+</ContentPage>
