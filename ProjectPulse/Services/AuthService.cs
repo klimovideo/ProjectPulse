@@ -1,115 +1,110 @@
-using System;
-using System.Threading.Tasks;
-using ProjectPulse.Models;
-using ProjectPulse.Database;
-using System.Diagnostics;
-using System.Security.Cryptography;
 using System.Text;
 using System.IdentityModel.Tokens.Jwt;
-using Microsoft.IdentityModel.Tokens;
 using System.Security.Claims;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
+using ProjectPulse.Models;        // User, UserRole, RoleType
+using System.Diagnostics;
 using BCrypt.Net;
-
 namespace ProjectPulse.Services
 {
     public class AuthService
     {
-        private readonly DatabaseService _database;
+        private readonly ProjectPulseContext _db;
         private User? _currentUser;
-        private const string SecretKey = "ProjectPulseSecretKey2025"; // In production, this should be stored securely
 
-        public AuthService(DatabaseService database)
+        // В продакшене хранить в безопасном хранилище
+        private const string SecretKey = "ProjectPulseSecretKey2025";
+
+        public AuthService(ProjectPulseContext dbContext)
         {
-            _database = database;
+            _db = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
         }
 
         public User? CurrentUser => _currentUser;
 
-        public async Task<User?> LoginAsync(string username, string password)
+        public async Task<User?> LoginAsync(string email, string password)
         {
             try
             {
-                var users = await _database.GetItemsAsync<User>("SELECT * FROM Users WHERE Username = ? OR Email = ?", username, username);
-                if (users.Count == 0)
-                {
+                var user = await _db.Users
+                                    .FirstOrDefaultAsync(u => u.Email == email);
+                if (user == null)
                     return null;
-                }
 
-                var user = users[0];
-                if (BCrypt.Net.BCrypt.Verify(password, user.PasswordHash))
-                {
-                    user.LastLogin = DateTime.Now;
-                    await _database.SaveItemAsync(user);
-                    
-                    // Generate token
-                    user.AuthToken = GenerateJwtToken(user);
-                    
-                    _currentUser = user;
-                    return user;
-                }
+                if (!BCrypt.Verify(password, user.PasswordHash))
+                    return null;
 
-                return null;
+                user.LastLogin = DateTime.UtcNow;
+                user.UpdatedAt = DateTime.UtcNow;
+                await _db.SaveChangesAsync();
+
+                // Сохраняем токен в свойстве (не в БД)
+                user.AuthToken = GenerateJwtToken(user);
+                _currentUser = user;
+                return user;
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"Error logging in: {ex.Message}");
+                Debug.WriteLine($"[AuthService] LoginAsync: {ex}");
                 throw;
             }
         }
 
-        public async Task<User?> RegisterUserAsync(string username, string email, string password, string firstName, string lastName)
+        public async Task<User?> RegisterUserAsync(
+            string email,
+            string password,
+            string fullName,
+            string? avatarPath = null)
         {
             try
             {
-                // Check if user already exists
-                var existingUsers = await _database.GetItemsAsync<User>("SELECT * FROM Users WHERE Username = ? OR Email = ?", username, email);
-                if (existingUsers.Count > 0)
-                {
+                // Проверяем существующий e-mail
+                if (await _db.Users.AnyAsync(u => u.Email == email))
                     return null;
-                }
 
-                // Create new user
+                var now = DateTime.UtcNow;
                 var user = new User
                 {
-                    Username = username,
-                    Email = email,
-                    PasswordHash = BCrypt.Net.BCrypt.HashPassword(password),
-                    FirstName = firstName,
-                    LastName = lastName,
-                    CreatedAt = DateTime.Now
+                    Email            = email,
+                    PasswordHash     = BCrypt.Net.BCrypt.HashPassword(password),
+                    FullName         = fullName,
+                    AvatarPath       = avatarPath ?? string.Empty,
+                    UseBiometricAuth = false,
+                    CreatedAt        = now,
+                    UpdatedAt        = now,
                 };
 
-                await _database.SaveItemAsync(user);
+                await _db.Users.AddAsync(user);
+                await _db.SaveChangesAsync();
 
-                // By default, new user gets Employee role
-                var userRole = new UserRole
+                // Назначаем роль Employee
+                var role = new UserRole
                 {
                     UserId = user.Id,
-                    Role = RoleType.Employee
+                    Role   = RoleType.Employee
                 };
-                await _database.SaveItemAsync(userRole);
+                await _db.UserRoles.AddAsync(role);
+                await _db.SaveChangesAsync();
 
                 _currentUser = user;
                 return user;
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"Error registering user: {ex.Message}");
+                Debug.WriteLine($"[AuthService] RegisterUserAsync: {ex}");
                 throw;
             }
         }
 
-        public async Task<bool> CheckBiometricAvailabilityAsync(string username)
+        public async Task<bool> CheckBiometricAvailabilityAsync(string email)
         {
             try
             {
-                var users = await _database.GetItemsAsync<User>("SELECT * FROM Users WHERE Username = ? OR Email = ?", username, username);
-                if (users.Count == 0)
-                {
-                    return false;
-                }
-
-                return users[0].UseBiometricAuth;
+                return await _db.Users
+                                .Where(u => u.Email == email)
+                                .Select(u => u.UseBiometricAuth)
+                                .FirstOrDefaultAsync();
             }
             catch
             {
@@ -117,24 +112,21 @@ namespace ProjectPulse.Services
             }
         }
 
-        public async Task<bool> LoginWithBiometricAsync(string username)
+        public async Task<bool> LoginWithBiometricAsync(string email)
         {
             try
             {
-                var users = await _database.GetItemsAsync<User>("SELECT * FROM Users WHERE Username = ? OR Email = ? AND UseBiometricAuth = 1", 
-                    username, username);
-                
-                if (users.Count == 0)
+                var user = await _db.Users
+                                    .FirstOrDefaultAsync(u => u.Email == email && u.UseBiometricAuth);
+                if (user == null)
                     return false;
-                
-                var user = users[0];
-                user.LastLogin = DateTime.Now;
-                await _database.SaveItemAsync(user);
-                
-                // Generate token
+
+                user.LastLogin = DateTime.UtcNow;
+                user.UpdatedAt = DateTime.UtcNow;
+                await _db.SaveChangesAsync();
+
                 user.AuthToken = GenerateJwtToken(user);
                 _currentUser = user;
-                
                 return true;
             }
             catch
@@ -143,30 +135,23 @@ namespace ProjectPulse.Services
             }
         }
 
-        public async Task<bool> LogoutAsync()
+        public Task<bool> LogoutAsync()
         {
-            try
-            {
-                _currentUser = null;
-                return true;
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"Error logging out: {ex.Message}");
-                throw;
-            }
+            _currentUser = null;
+            return Task.FromResult(true);
         }
 
         public async Task<bool> EnableBiometricAuthAsync(int userId)
         {
             try
             {
-                var user = await _database.GetItemAsync<User>(userId);
+                var user = await _db.Users.FindAsync(userId);
                 if (user == null)
                     return false;
 
                 user.UseBiometricAuth = true;
-                await _database.SaveItemAsync(user);
+                user.UpdatedAt        = DateTime.UtcNow;
+                await _db.SaveChangesAsync();
                 return true;
             }
             catch
@@ -179,8 +164,11 @@ namespace ProjectPulse.Services
         {
             try
             {
-                var userRoles = await _database.GetItemsAsync<UserRole>("SELECT * FROM UserRoles WHERE UserId = ?", userId);
-                return userRoles.Count > 0 ? userRoles[0].Role : RoleType.Employee;
+                var role = await _db.UserRoles
+                                    .Where(r => r.UserId == userId)
+                                    .Select(r => r.Role)
+                                    .FirstOrDefaultAsync();
+                return role == default ? RoleType.Employee : role;
             }
             catch
             {
@@ -190,23 +178,24 @@ namespace ProjectPulse.Services
 
         private string GenerateJwtToken(User user)
         {
-            var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(SecretKey));
-            var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256);
+            var key   = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(SecretKey));
+            var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
 
             var claims = new[]
             {
-                new Claim(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
+                new Claim(JwtRegisteredClaimNames.Sub,   user.Id.ToString()),
                 new Claim(JwtRegisteredClaimNames.Email, user.Email),
-                new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
-                new Claim("username", user.Username)
+                new Claim(JwtRegisteredClaimNames.Jti,   Guid.NewGuid().ToString()),
+                new Claim("fullName",                    user.FullName)
             };
 
             var token = new JwtSecurityToken(
-                issuer: "ProjectPulse",
+                issuer:   "ProjectPulse",
                 audience: "MobileApp",
-                claims: claims,
-                expires: DateTime.Now.AddDays(7),
-                signingCredentials: credentials);
+                claims:   claims,
+                expires:  DateTime.UtcNow.AddDays(7),
+                signingCredentials: creds
+            );
 
             return new JwtSecurityTokenHandler().WriteToken(token);
         }

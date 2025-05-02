@@ -1,130 +1,129 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
-using ProjectPulse.Models;
-using ProjectPulse.Services;
-using Microsoft.Maui.ApplicationModel;
+using Microsoft.EntityFrameworkCore;
 using System.Diagnostics;
+using ProjectPulse.Models;
 
 namespace ProjectPulse.Services
 {
     public class AIService
     {
-        private readonly TaskService _taskService;
-        private readonly ProjectService _projectService;
+        private readonly ProjectPulseContext _db;
 
-        public AIService(TaskService taskService, ProjectService projectService)
+        public AIService(ProjectPulseContext dbContext)
         {
-            _taskService = taskService ?? throw new ArgumentNullException(nameof(taskService));
-            _projectService = projectService ?? throw new ArgumentNullException(nameof(projectService));
+            _db = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
         }
 
         public async Task<string> GenerateTaskDescriptionAsync(ProjectTask task)
         {
+            if (task == null) throw new ArgumentNullException(nameof(task));
+
             try
             {
-                if (task == null)
-                    throw new ArgumentNullException(nameof(task));
+                var description = $"{task.Title} - {task.Priority} priority task";
 
-                // Generate description based on task properties
-                string description = $"{task.Title} - {task.Priority} priority task";
-                
-                if (task.DueDate.HasValue)
-                    description += $" - Due: {task.DueDate.Value.ToString("d")}";
+                if (task.DueDate != default)
+                    description += $" - Due: {task.DueDate:d}";
 
-                if (task.ProjectId.HasValue)
-                {
-                    var project = await _projectService.GetProjectByIdAsync(task.ProjectId.Value);
-                    if (project != null)
-                        description += $" - Project: {project.Name}";
-                }
+                var project = await _db.Projects
+                                       .Where(p => p.Id == task.ProjectId)
+                                       .Select(p => new { p.Name })
+                                       .FirstOrDefaultAsync();
+                if (project != null)
+                    description += $" - Project: {project.Name}";
 
                 return description;
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"Error generating task description: {ex.Message}");
+                Debug.WriteLine($"[AIService] GenerateTaskDescriptionAsync: {ex}");
                 throw;
             }
         }
 
         public async Task<string> GenerateTaskRecommendationsAsync(ProjectTask task)
         {
+            if (task == null) throw new ArgumentNullException(nameof(task));
+
             try
             {
-                if (task == null)
-                    throw new ArgumentNullException(nameof(task));
+                var relatedTasks = await _db.ProjectTasks
+                                            .Where(t => t.ProjectId == task.ProjectId)
+                                            .ToListAsync();
 
-                // Get related tasks for context
-                var relatedTasks = await _taskService.GetTasksByProjectAsync(task.ProjectId.Value);
+                var recs = new List<string>();
+                if (task.Priority == TaskPriority.Low)
+                    recs.Add("Consider delegating this task");
 
-                // Generate recommendations based on task properties and related tasks
-                string recommendations = "Recommendations:\n";
-                
-                if (task.Priority == ProjectPulse.Models.TaskPriority.Low)
-                    recommendations += "- Consider delegating this task\n";
-                
-                if (task.DueDate.HasValue && task.DueDate.Value < DateTime.Now.AddDays(2))
-                    recommendations += "- Start working on this task immediately\n";
+                if ((task.DueDate - DateTime.Now).TotalDays < 2)
+                    recs.Add("Start working on this task immediately");
 
-                return recommendations;
+                return recs.Count > 0
+                    ? "Recommendations:\n- " + string.Join("\n- ", recs)
+                    : "No special recommendations.";
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"Error generating task recommendations: {ex.Message}");
+                Debug.WriteLine($"[AIService] GenerateTaskRecommendationsAsync: {ex}");
                 throw;
             }
         }
 
-        public async Task<string> GenerateProjectSummaryAsync(ProjectPulse.Models.Project project)
+        public async Task<string> GenerateProjectSummaryAsync(Project project)
         {
+            if (project == null) throw new ArgumentNullException(nameof(project));
+
             try
             {
-                if (project == null)
-                    throw new ArgumentNullException(nameof(project));
+                var tasksCount = await _db.ProjectTasks
+                                         .CountAsync(t => t.ProjectId == project.Id);
 
-                // Get project tasks for context
-                var tasks = await _taskService.GetTasksByProjectAsync(project.Id);
+                var completedCount = await _db.ProjectTasks
+                                            .CountAsync(t => t.ProjectId == project.Id && t.Status == ProjectStatus.Completed);
 
-                // Generate summary based on project properties and tasks
-                string summary = $"Project: {project.Name}\n";
-                summary += $"Status: {project.Status}\n";
-                
+                var summary = $"Project: {project.Name}\n" +
+                              $"Status: {project.Status}\n" +
+                              $"Total Tasks: {tasksCount}, Completed: {completedCount}\n";
+
                 if (project.EndDate.HasValue)
-                    summary += $"Due Date: {project.EndDate.Value.ToString("d")}\n";
+                    summary += $"Due Date: {project.EndDate:d}\n";
 
                 return summary;
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"Error generating project summary: {ex.Message}");
+                Debug.WriteLine($"[AIService] GenerateProjectSummaryAsync: {ex}");
                 throw;
             }
         }
 
-        public async Task<string> GenerateTaskOptimizationAsync(ProjectPulse.Models.Project project)
+        public async Task<string> GenerateTaskOptimizationAsync(Project project)
         {
+            if (project == null) throw new ArgumentNullException(nameof(project));
+
             try
             {
-                if (project == null)
-                    throw new ArgumentNullException(nameof(project));
+                var tasks = await _db.ProjectTasks
+                                     .Where(t => t.ProjectId == project.Id)
+                                     .ToListAsync();
 
-                // Get project tasks
-                var tasks = await _taskService.GetTasksByProjectAsync(project.Id);
+                var suggestions = new List<string>();
+                var overdue = tasks
+                    .Where(t => t.DueDate < DateTime.Now && t.Status != ProjectStatus.Completed)
+                    .ToList();
+                if (overdue.Any())
+                    suggestions.Add("Address overdue tasks immediately");
 
-                // Generate optimization suggestions
-                string optimization = "Task Optimization Suggestions:\n";
-                
-                // Basic optimization logic
-                var overdueTasks = tasks.Where(t => t.DueDate.HasValue && t.DueDate.Value < DateTime.Now && t.Status != ProjectPulse.Models.Status.Completed);
-                if (overdueTasks.Any())
-                    optimization += "- Address overdue tasks immediately\n";
-
-                return optimization;
+                return suggestions.Count > 0
+                    ? "Task Optimization Suggestions:\n- " + string.Join("\n- ", suggestions)
+                    : "No optimization suggestions at this time.";
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"Error generating task optimization: {ex.Message}");
+                Debug.WriteLine($"[AIService] GenerateTaskOptimizationAsync: {ex}");
                 throw;
             }
         }
@@ -133,68 +132,59 @@ namespace ProjectPulse.Services
         {
             try
             {
-                var tasks = await _taskService.GetTasksByUserAsync(userId);
-                if (tasks == null || !tasks.Any())
+                var tasks = await _db.ProjectTasks
+                                     .Where(t => t.AssignedTo == userId)
+                                     .Include(t => t.SubTasks)
+                                     .ToListAsync();
+
+                if (!tasks.Any())
                     return new List<ProjectTask>();
 
                 return OrderTasksByPriority(tasks);
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+                Debug.WriteLine($"[AIService] GetRecommendedTaskOrderAsync: {ex}");
                 return new List<ProjectTask>();
             }
         }
 
         private List<ProjectTask> OrderTasksByPriority(List<ProjectTask> tasks)
         {
-            // First, separate completed tasks
-            var completedTasks = tasks.Where(t => t.Status == ProjectStatus.Completed).ToList();
-            var pendingTasks = tasks.Where(t => t.Status != ProjectStatus.Completed).ToList();
-            
-            // Order pending tasks by a priority score
-            var orderedTasks = pendingTasks.OrderByDescending(t => CalculateTaskPriorityScore(t)).ToList();
-            
-            // Completed tasks go to the end
-            orderedTasks.AddRange(completedTasks);
-            return orderedTasks;
+            var completed = tasks.Where(t => t.Status == ProjectStatus.Completed).ToList();
+            var pending   = tasks.Where(t => t.Status != ProjectStatus.Completed).ToList();
+
+            var ordered = pending
+                .OrderByDescending(CalculateTaskPriorityScore)
+                .ToList();
+
+            ordered.AddRange(completed);
+            return ordered;
         }
 
-        private double CalculateTaskPriorityScore(ProjectTask task)
+        private double CalculateTaskPriorityScore(ProjectTask t)
         {
             double score = 0;
-            
-            // Factor 1: Due date urgency
-            if (task.DueDate.HasValue)
+
+            var daysLeft = (t.DueDate - DateTime.Now).TotalDays;
+            if (daysLeft < 0)        score += 50;
+            else if (daysLeft < 1)   score += 40;
+            else if (daysLeft < 2)   score += 30;
+            else if (daysLeft < 7)   score += 20;
+            else if (daysLeft < 14)  score += 10;
+
+            score += t.Priority switch
             {
-                int daysLeft = (int)(task.DueDate.Value - DateTime.Now).TotalDays;
-                if (daysLeft < 0) score += 50; // Overdue
-                else if (daysLeft < 1) score += 40; // Due today
-                else if (daysLeft < 2) score += 30; // Due tomorrow
-                else if (daysLeft < 7) score += 20; // Due this week
-                else if (daysLeft < 14) score += 10; // Due next week
-            }
-            
-            // Factor 2: Priority level
-            switch (task.Priority)
-            {
-                case TaskPriority.High:
-                    score += 50;
-                    break;
-                case TaskPriority.Medium:
-                    score += 15;
-                    break;
-                case TaskPriority.Low:
-                    score += 5;
-                    break;
-            }
-            
-            // Factor 3: Task status (in progress tasks get priority)
-            if (task.Status == ProjectStatus.InProgress)
+                TaskPriority.High   => 50,
+                TaskPriority.Medium => 15,
+                TaskPriority.Low    => 5,
+                _                   => 0
+            };
+
+            if (t.Status == ProjectStatus.InProgress)
                 score += 10;
-                
-            // Factor 4: Complexity (approximated by number of subtasks)
-            score += task.SubTasks?.Count ?? 0;
-            
+
+            score += t.SubTasks?.Count ?? 0;
             return score;
         }
 
@@ -202,68 +192,51 @@ namespace ProjectPulse.Services
         {
             try
             {
-                var task = await _taskService.GetTaskByIdAsync(taskId);
-                if (task == null)
-                    return "Task not found";
+                var task = await _db.ProjectTasks.FindAsync(taskId);
+                if (task == null) return "Task not found";
 
                 return SimulateTaskPrediction(task);
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"Error getting task completion prediction: {ex.Message}");
+                Debug.WriteLine($"[AIService] GetTaskCompletionPredictionAsync: {ex}");
                 return "Error predicting task completion";
             }
         }
 
-        private string SimulateTaskPrediction(ProjectTask task)
+        private string SimulateTaskPrediction(ProjectTask t)
         {
-            // Calculate days left
-            int daysLeft = (int)(task.DueDate.Value - DateTime.Now).TotalDays;
-            
-            // Calculate completion probability
-            double completionProbability = 0.8; // Base probability
-            
-            // Adjust probability based on factors
-            switch (task.Priority)
+            var daysLeft = (t.DueDate - DateTime.Now).Days;
+            double prob  = 0.8;
+
+            prob += t.Priority switch
             {
-                case TaskPriority.High:
-                    completionProbability += 0.15;
-                    break;
-                case TaskPriority.Low:
-                    completionProbability -= 0.1;
-                    break;
-            }
-            
-            if (daysLeft < 0)
-                completionProbability -= 0.2;
-            else if (daysLeft < 3)
-                completionProbability += 0.1;
-            
-            completionProbability = Math.Max(0, Math.Min(1, completionProbability));
-            
-            return $"Task completion probability: {completionProbability * 100:F1}%\n" +
-                   $"Estimated completion time: {CalculateEstimatedHours(task)} hours";
+                TaskPriority.High => 0.15,
+                TaskPriority.Low  => -0.1,
+                _                 => 0
+            };
+
+            if (daysLeft < 0)        prob -= 0.2;
+            else if (daysLeft < 3)   prob += 0.1;
+
+            prob = Math.Clamp(prob, 0, 1);
+
+            return $"Task completion probability: {prob * 100:F1}%\n" +
+                   $"Estimated completion time: {CalculateEstimatedHours(t)} hours";
         }
 
-        private int CalculateEstimatedHours(ProjectTask task)
+        private int CalculateEstimatedHours(ProjectTask t)
         {
-            int baseHours = 4; // Default baseline
-            
-            // Adjust for priority
-            switch (task.Priority)
+            int hours = 4;
+            hours += t.Priority switch
             {
-                case TaskPriority.High:
-                    baseHours += 2;
-                    break;
-                case TaskPriority.Low:
-                    baseHours = Math.Max(1, baseHours - 1);
-                    break;
-            }
-            
-            // Adjust for complexity
-            baseHours += task.SubTasks?.Count ?? 0;
-            
-            return Math.Max(1, baseHours);
+                TaskPriority.High => 2,
+                TaskPriority.Low  => -1,
+                _                 => 0
+            };
+
+            hours += t.SubTasks?.Count ?? 0;
+            return Math.Max(1, hours);
         }
     }
 }

@@ -1,70 +1,46 @@
-using SQLite;
 using System;
-using System.Collections.Generic;
+using Microsoft.EntityFrameworkCore;
+using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace ProjectPulse.Models
 {
-    [Table("Projects")]
     public class Project
     {
-        [PrimaryKey]
-        public Guid Id { get; set; }
-        [MaxLength(100)]
-        public string Name { get; set; }
-        public string Description { get; set; }
-        public DateTime StartDate { get; set; }
-        public DateTime? EndDate { get; set; }
-        public ProjectStatus Status { get; set; }
-        public ProjectPriority Priority { get; set; }
-        public Guid CreatedBy { get; set; }
-        public DateTime CreatedAt { get; set; }
-        public DateTime UpdatedAt { get; set; }
-        
-        // Additional properties
-        [Ignore]
-        public double CompletionPercentage { get; set; }
-        [Ignore]
-        public int TotalTasks { get; set; }
-        [Ignore]
-        public int CompletedTasks { get; set; }
-        [Ignore]
-        public List<User> TeamMembers { get; set; }
+        [Key, DatabaseGenerated(DatabaseGeneratedOption.Identity)]
+        public int Id { get; set; }
 
-        public Project()
-        {
-            Id = Guid.NewGuid();
-            Status = ProjectStatus.New;
-            Priority = ProjectPriority.Medium;
-            CreatedAt = DateTime.Now;
-            UpdatedAt = DateTime.Now;
-            TeamMembers = new List<User>();
-        }
+        [Required, MaxLength(100)] public string Name { get; set; }
+        public string Description  { get; set; }
+        public DateTime StartDate  { get; set; }
+        public DateTime? EndDate   { get; set; }
+        public ProjectStatus Status   { get; set; } = ProjectStatus.New;
+        public ProjectPriority Priority{ get; set; } = ProjectPriority.Medium;
+        public int  CreatedBy     { get; set; }
+        public DateTime CreatedAt { get; set; } = DateTime.Now;
+        public DateTime UpdatedAt { get; set; } = DateTime.Now;
+
+        //-- Навигация
+        public User Creator { get; set; }
+        public ICollection<ProjectTask> Tasks        { get; set; } = new();
+        public ICollection<UserProject> UserProjects { get; set; } = new();
+        public ICollection<TeamPulse>   TeamPulses   { get; set; } = new();
     }
 
     [Table("UserProjects")]
     public class UserProject
     {
-        [PrimaryKey]
-        public Guid Id { get; set; }
-        [Indexed]
-        public Guid UserId { get; set; }
-        [Indexed]
-        public Guid ProjectId { get; set; }
-        public DateTime JoinedAt { get; set; }
+        [Key, DatabaseGenerated(DatabaseGeneratedOption.Identity)]
+        public int Id { get; set; }
 
-        public UserProject()
-        {
-            Id = Guid.NewGuid();
-            JoinedAt = DateTime.Now;
-        }
+        public int UserId   { get; set; }
+        public int ProjectId{ get; set; }
+        public DateTime JoinedAt { get; set; } = DateTime.Now;
+
+        public User    User    { get; set; }
+        public Project Project { get; set; }
     }
 
-    
-    public enum ProjectPriority
-    {
-        Low,
-        Medium,
-        High,
-        Critical
-    }
+    public enum ProjectPriority { Low, Medium, High, Critical }
+    public enum ProjectStatus  { New, Planned, InProgress, OnHold, Blocked, Completed, Cancelled }
 }

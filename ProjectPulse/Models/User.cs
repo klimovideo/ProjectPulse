@@ -1,57 +1,50 @@
-using SQLite;
 using System;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace ProjectPulse.Models
 {
-    [Table("Users")]
     public class User
     {
-        [PrimaryKey]
-        public Guid Id { get; set; }
-        [MaxLength(100)]
+        [Key, DatabaseGenerated(DatabaseGeneratedOption.Identity)]
+        public int Id { get; set; }
+
+        [Required, MaxLength(100)]
         public string Email { get; set; }
+
+        [Required]
         public string PasswordHash { get; set; }
+
+        [Required, MaxLength(200)]
         public string FullName { get; set; }
+
         public string AvatarPath { get; set; }
+
         public bool UseBiometricAuth { get; set; }
-        public DateTime CreatedAt { get; set; }
-        public DateTime UpdatedAt { get; set; }
+
+        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
+        public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+
         public DateTime? LastLogin { get; set; }
-        
-        // Additional properties for syncing with server
-        [Ignore]
-        public string AuthToken { get; set; }
-        [Ignore]
-        public bool IsSynced { get; set; }
 
-        public User()
-        {
-            Id = Guid.NewGuid();
-            CreatedAt = DateTime.Now;
-            UpdatedAt = DateTime.Now;
-        }
-    }
+        /// <summary>
+        /// JWT-токен, сгенерированный при логине.
+        /// Не сохраняется в БД.
+        /// </summary>
+        [NotMapped]
+        public string? AuthToken { get; set; }
 
-    [Table("UserRoles")]
-    public class UserRole
-    {
-        [PrimaryKey]
-        public Guid Id { get; set; }
-        [Indexed]
-        public Guid UserId { get; set; }
-        public RoleType Role { get; set; }
-        
-        public UserRole()
-        {
-            Id = Guid.NewGuid();
-        }
-    }
+        // Навигационные свойства
 
-    public enum RoleType
-    {
-        Administrator,
-        ProjectManager,
-        Employee
+        public ICollection<Notification> Notifications   { get; set; } = new List<Notification>();
+        public ICollection<UserRole>     Roles           { get; set; } = new List<UserRole>();
+        public ICollection<ProjectTask>  AssignedTasks   { get; set; } = new List<ProjectTask>();
+        public ICollection<ProjectTask>  CreatedTasks    { get; set; } = new List<ProjectTask>();
+        public ICollection<Project>      ProjectsOwned   { get; set; } = new List<Project>();
+        public ICollection<UserProject>  UserProjects    { get; set; } = new List<UserProject>();
+        public ICollection<Comment>      Comments        { get; set; } = new List<Comment>();
+        public ICollection<TeamPulse>    TeamPulses      { get; set; } = new List<TeamPulse>();
     }
 }

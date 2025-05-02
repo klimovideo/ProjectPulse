@@ -6,6 +6,8 @@ using ProjectPulse.ViewModels;
 using ProjectPulse.Views;
 using ProjectPulse.Helpers;
 using Syncfusion.Maui.Core.Hosting;
+using ProjectPulse.Models;
+using Microsoft.EntityFrameworkCore;
 
 namespace ProjectPulse;
 
@@ -24,6 +26,13 @@ public static class MauiProgram
 				fonts.AddFont("OpenSans-Semibold.ttf", "OpenSansSemibold");
 				fonts.AddFont("MaterialIcons-Regular.ttf", "MaterialIcons");
 			});
+
+		builder.Services.AddDbContext<ProjectPulseContext>(options =>
+            options.UseSqlite(
+                // в MAUI путь к файлу обычно так:
+                $"Data Source={Path.Combine(FileSystem.AppDataDirectory, "projectpulse.db")}"
+            )
+        );
 
 #if DEBUG
 		builder.Logging.AddDebug();

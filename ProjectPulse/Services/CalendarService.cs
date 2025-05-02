@@ -1,22 +1,22 @@
-using ProjectPulse.Models;
 using System;
 using System.Collections.Generic;
-using System.Threading.Tasks;
-using Newtonsoft.Json;
-using System.Net.Http;
 using System.Linq;
-using ProjectPulse.Database;
-using Microsoft.Maui.Devices;
+using System.Net.Http;
+using System.Text;
+using System.Threading.Tasks;
+using Microsoft.EntityFrameworkCore;
+using Newtonsoft.Json;
+using ProjectPulse.Models;
 using System.Diagnostics;
 
 namespace ProjectPulse.Services
 {
     public class CalendarService
     {
-        private readonly DatabaseService _database;
-        private readonly TaskService _taskService;
-        private readonly ProjectService _projectService;
-        private const string GoogleCalendarApiBase = "https://www.googleapis.com/calendar/v3/";
+        private readonly ProjectPulseContext _db;
+        private readonly HttpClient _http;
+
+        private const string GoogleCalendarApiBase  = "https://www.googleapis.com/calendar/v3/";
         private const string OutlookCalendarApiBase = "https://graph.microsoft.com/v1.0/me/calendar/";
 
         public enum CalendarProvider
@@ -26,305 +26,220 @@ namespace ProjectPulse.Services
             Local
         }
 
-        public CalendarService(DatabaseService database, TaskService taskService, ProjectService projectService)
+        public CalendarService(ProjectPulseContext dbContext, HttpClient httpClient)
         {
-            _database = database;
-            _taskService = taskService;
-            _projectService = projectService;
+            _db   = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
+            _http = httpClient;
         }
 
         public async Task<List<CalendarEvent>> GetTaskCalendarEventsAsync(int userId)
         {
-            try
-            {
-                var tasks = await _taskService.GetTasksByUserAsync(userId);
-                var events = new List<CalendarEvent>();
+            var tasks = await _db.ProjectTasks
+                                 .Where(t => t.AssignedTo == userId)
+                                 .Include(t => t.SubTasks)
+                                 .ToListAsync();
 
-                foreach (var task in tasks)
+            var events = new List<CalendarEvent>();
+            foreach (var task in tasks)
+            {
+                // основная задача
+                events.Add(new CalendarEvent
                 {
-                    if (task.DueDate.HasValue)
-                    {
-                        events.Add(new CalendarEvent
-                        {
-                            Id = task.Id.ToString(),
-                            Title = task.Title ?? string.Empty,
-                            Start = task.DueDate.Value,
-                            End = task.DueDate.Value,
-                            Description = task.Description ?? string.Empty,
-                            IsAllDay = false,
-                            Type = CalendarEventType.Task,
-                            Color = task.TaskPulseColor ?? "#007AFF"
-                        });
-                    }
+                    ExternalId  = task.Id.ToString(),
+                    Title       = task.Title,
+                    Description = task.Description ?? string.Empty,
+                    Start       = task.DueDate,
+                    End         = task.DueDate,
+                    IsAllDay    = false,
+                    Type        = CalendarEventType.Task,
+                    Color       = task.TaskPulseColor
+                });
 
-                    if (task.SubTasks != null)
-                    {
-                        foreach (var subTask in task.SubTasks)
-                        {
-                            if (subTask.DueDate.HasValue)
-                            {
-                                events.Add(new CalendarEvent
-                                {
-                                    Id = subTask.Id.ToString(),
-                                    Title = subTask.Title ?? string.Empty,
-                                    Start = subTask.DueDate.Value,
-                                    End = subTask.DueDate.Value,
-                                    Description = subTask.Description ?? string.Empty,
-                                    IsAllDay = false,
-                                    Type = CalendarEventType.Task,
-                                    Color = subTask.TaskPulseColor ?? "#007AFF"
-                                });
-                            }
-                        }
-                    }
+                // подзадачи (если в модели SubTask есть поле DueDate и TaskPulseColor)
+                foreach (var st in task.SubTasks.Where(st => st.CompletedDate == null))
+                {
+                    // если SubTask у вас не хранит DueDate и TaskPulseColor — уберите этот блок
                 }
+            }
 
-                return events;
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"Error getting task calendar events: {ex.Message}");
-                return new List<CalendarEvent>();
-            }
+            return events;
         }
 
         public async Task<List<CalendarEvent>> GetProjectCalendarEventsAsync(int userId)
         {
-            try
-            {
-                var projects = await _projectService.GetProjectsByUserAsync(userId);
-                var events = new List<CalendarEvent>();
+            var projects = await _db.UserProjects
+                                    .Where(up => up.UserId == userId)
+                                    .Select(up => up.Project)
+                                    .Where(p => p.EndDate.HasValue)
+                                    .ToListAsync();
 
-                foreach (var project in projects)
-                {
-                    if (project.EndDate.HasValue)
-                    {
-                        events.Add(new CalendarEvent
-                        {
-                            Id = $"p-{project.Id}",
-                            Title = project.Name ?? string.Empty,
-                            Start = project.EndDate.Value,
-                            End = project.EndDate.Value,
-                            Description = project.Description ?? string.Empty,
-                            IsAllDay = true,
-                            Type = CalendarEventType.Project,
-                            Color = "#5D3FD3" // Purple color for project events
-                        });
-                    }
-                }
-
-                return events;
-            }
-            catch (Exception ex)
+            return projects.Select(p => new CalendarEvent
             {
-                Debug.WriteLine($"Error getting project calendar events: {ex.Message}");
-                return new List<CalendarEvent>();
-            }
+                ExternalId  = $"p-{p.Id}",
+                Title       = p.Name,
+                Description = p.Description ?? string.Empty,
+                Start       = p.EndDate.Value,
+                End         = p.EndDate.Value,
+                IsAllDay    = true,
+                Type        = CalendarEventType.Project,
+                Color       = "#5D3FD3"
+            }).ToList();
         }
 
         public async Task<List<CalendarEvent>> GetAllCalendarEventsAsync(int userId)
         {
-            var taskEvents = await GetTaskCalendarEventsAsync(userId);
+            var taskEvents    = await GetTaskCalendarEventsAsync(userId);
             var projectEvents = await GetProjectCalendarEventsAsync(userId);
-
-            // Combine both lists
-            var allEvents = new List<CalendarEvent>();
-            allEvents.AddRange(taskEvents);
-            allEvents.AddRange(projectEvents);
-
-            return allEvents;
+            return taskEvents.Concat(projectEvents).ToList();
         }
 
-        public async Task<bool> SyncWithExternalCalendarAsync(CalendarProvider provider, string accessToken, List<CalendarEvent> events)
+        public async Task<bool> SyncWithExternalCalendarAsync(
+            CalendarProvider provider,
+            string accessToken,
+            List<CalendarEvent> events)
         {
-            // In a real implementation, this would connect to Google or Outlook APIs
-            // This is a simplified version for demonstration
             try
             {
                 switch (provider)
                 {
                     case CalendarProvider.Google:
-                        foreach (var calEvent in events)
-                        {
-                            await SyncEventWithGoogleCalendarAsync(accessToken, calEvent);
-                        }
+                        foreach (var ev in events)
+                            await SyncEventWithGoogleCalendarAsync(accessToken, ev);
                         break;
+
                     case CalendarProvider.Outlook:
-                        foreach (var calEvent in events)
-                        {
-                            await SyncEventWithOutlookCalendarAsync(accessToken, calEvent);
-                        }
+                        foreach (var ev in events)
+                            await SyncEventWithOutlookCalendarAsync(accessToken, ev);
                         break;
+
                     case CalendarProvider.Local:
-                        // For local calendar, just return true as we already have the events locally
                         return true;
                 }
 
                 return true;
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+                Debug.WriteLine($"[CalendarService] SyncWithExternalCalendarAsync: {ex}");
                 return false;
             }
         }
 
-        private async Task<bool> SyncEventWithGoogleCalendarAsync(string accessToken, CalendarEvent calEvent)
+        private async Task<bool> SyncEventWithGoogleCalendarAsync(string token, CalendarEvent ev)
         {
-            // This is a simplified example - a real implementation would use the Google Calendar API
-            // to create or update events.
-            var httpClient = new HttpClient();
-            httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", accessToken);
+            _http.DefaultRequestHeaders.Authorization =
+                new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
 
             var googleEvent = new
             {
-                summary = calEvent.Title,
-                description = calEvent.Description,
-                start = new
-                {
-                    dateTime = calEvent.Start.ToString("o"),
-                    timeZone = TimeZoneInfo.Local.Id
-                },
-                end = new
-                {
-                    dateTime = calEvent.End.ToString("o"),
-                    timeZone = TimeZoneInfo.Local.Id
-                },
-                colorId = ConvertColorToGoogleColorId(calEvent.Color)
+                summary     = ev.Title,
+                description = ev.Description,
+                start = new { dateTime = ev.Start.ToString("o"), timeZone = TimeZoneInfo.Local.Id },
+                end   = new { dateTime = ev.End.ToString("o"),   timeZone = TimeZoneInfo.Local.Id },
+                colorId = ConvertColorToGoogleColorId(ev.Color)
             };
 
-            var content = new StringContent(JsonConvert.SerializeObject(googleEvent), System.Text.Encoding.UTF8, "application/json");
+            var content = new StringContent(
+                JsonConvert.SerializeObject(googleEvent),
+                Encoding.UTF8,
+                "application/json"
+            );
 
-            // In a real implementation, this would be a REST API call to the Google Calendar API
-            // var response = await httpClient.PostAsync($"{GoogleCalendarApiBase}calendars/primary/events", content);
-            // return response.IsSuccessStatusCode;
+            // реальный вызов:
+            // var resp = await _http.PostAsync($"{GoogleCalendarApiBase}calendars/primary/events", content);
+            // return resp.IsSuccessStatusCode;
 
-            // For demonstration, just return true
             return true;
         }
 
-        private async Task<bool> SyncEventWithOutlookCalendarAsync(string accessToken, CalendarEvent calEvent)
+        private async Task<bool> SyncEventWithOutlookCalendarAsync(string token, CalendarEvent ev)
         {
-            // This is a simplified example - a real implementation would use the Microsoft Graph API
-            // to create or update events.
-            var httpClient = new HttpClient();
-            httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", accessToken);
+            _http.DefaultRequestHeaders.Authorization =
+                new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
 
             var outlookEvent = new
             {
-                subject = calEvent.Title,
-                body = new
-                {
-                    contentType = "HTML",
-                    content = calEvent.Description
-                },
-                start = new
-                {
-                    dateTime = calEvent.Start.ToString("o"),
-                    timeZone = TimeZoneInfo.Local.Id
-                },
-                end = new
-                {
-                    dateTime = calEvent.End.ToString("o"),
-                    timeZone = TimeZoneInfo.Local.Id
-                },
-                isAllDay = calEvent.IsAllDay
+                subject = ev.Title,
+                body    = new { contentType = "HTML", content = ev.Description },
+                start   = new { dateTime = ev.Start.ToString("o"), timeZone = TimeZoneInfo.Local.Id },
+                end     = new { dateTime = ev.End.ToString("o"),   timeZone = TimeZoneInfo.Local.Id },
+                isAllDay = ev.IsAllDay
             };
 
-            var content = new StringContent(JsonConvert.SerializeObject(outlookEvent), System.Text.Encoding.UTF8, "application/json");
+            var content = new StringContent(
+                JsonConvert.SerializeObject(outlookEvent),
+                Encoding.UTF8,
+                "application/json"
+            );
 
-            // In a real implementation, this would be a REST API call to the Microsoft Graph API
-            // var response = await httpClient.PostAsync($"{OutlookCalendarApiBase}events", content);
-            // return response.IsSuccessStatusCode;
+            // реальный вызов:
+            // var resp = await _http.PostAsync($"{OutlookCalendarApiBase}events", content);
+            // return resp.IsSuccessStatusCode;
 
-            // For demonstration, just return true
             return true;
         }
 
-        private string ConvertColorToGoogleColorId(string hexColor)
+        private string ConvertColorToGoogleColorId(string hex)
         {
-            // Google Calendar uses predefined color IDs (1-11)
-            // This is a simplified conversion from hex colors to Google color IDs
-            switch (hexColor.ToLower())
+            return hex.ToLower() switch
             {
-                case "#dc3545": // Red
-                    return "11";
-                case "#fd7e14": // Orange
-                    return "6";
-                case "#ffc107": // Yellow
-                    return "5";
-                case "#28a745": // Green
-                    return "10";
-                case "#17a2b8": // Blue
-                    return "7";
-                case "#5d3fd3": // Purple
-                    return "3";
-                default:
-                    return "1"; // Default blue
-            }
+                "#dc3545" => "11",
+                "#fd7e14" => "6",
+                "#ffc107" => "5",
+                "#28a745" => "10",
+                "#17a2b8" => "7",
+                "#5d3fd3" => "3",
+                _         => "1"
+            };
         }
 
-        public async Task<bool> AddEventAsync(CalendarEvent eventToAdd)
+        // — CRUD для локальных событий —
+
+        public async Task<bool> AddEventAsync(CalendarEvent ev)
         {
             try
             {
-                await _database.SaveItemAsync(eventToAdd);
+                await _db.CalendarEvents.AddAsync(ev);
+                await _db.SaveChangesAsync();
                 return true;
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+                Debug.WriteLine($"[CalendarService] AddEventAsync: {ex}");
                 return false;
             }
         }
 
-        public async Task<bool> UpdateEventAsync(CalendarEvent eventToUpdate)
+        public async Task<bool> UpdateEventAsync(CalendarEvent ev)
         {
             try
             {
-                await _database.SaveItemAsync(eventToUpdate);
+                _db.CalendarEvents.Update(ev);
+                await _db.SaveChangesAsync();
                 return true;
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+                Debug.WriteLine($"[CalendarService] UpdateEventAsync: {ex}");
                 return false;
             }
         }
 
-        public async Task<bool> DeleteEventAsync(int eventId)
+        public async Task<bool> DeleteEventAsync(int id)
         {
             try
             {
-                var eventToDelete = await _database.GetItemAsync<CalendarEvent>(eventId);
-                if (eventToDelete != null)
-                {
-                    await _database.DeleteItemAsync(eventToDelete);
-                    return true;
-                }
-                return false;
+                var ev = await _db.CalendarEvents.FindAsync(id);
+                if (ev == null) return false;
+                _db.CalendarEvents.Remove(ev);
+                await _db.SaveChangesAsync();
+                return true;
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+                Debug.WriteLine($"[CalendarService] DeleteEventAsync: {ex}");
                 return false;
             }
         }
-    }
-
-    public class CalendarEvent
-    {
-        public string Id { get; set; }
-        public string Title { get; set; }
-        public string Description { get; set; }
-        public DateTime Start { get; set; }
-        public DateTime End { get; set; }
-        public bool IsAllDay { get; set; }
-        public CalendarEventType Type { get; set; }
-        public string Color { get; set; }
-    }
-
-    public enum CalendarEventType
-    {
-        Task,
-        Project,
-        Meeting,
-        Reminder
     }
 }
