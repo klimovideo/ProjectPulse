@@ -85,7 +85,7 @@ namespace ProjectPulse.ViewModels
                 IsBusy = true;
                 ClearError();
                 
-                var currentUser = AuthService.CurrentUser;
+                var currentUser = this._authService.CurrentUser;
                 if (currentUser == null)
                     return;
                     

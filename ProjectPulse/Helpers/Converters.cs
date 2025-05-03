@@ -1,5 +1,6 @@
 using System;
 using System.Globalization;
+using ProjectPulse.Models;
 
 namespace ProjectPulse.Helpers
 {
@@ -66,15 +67,17 @@ namespace ProjectPulse.Helpers
     {
         public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
         {
+            ProjectStatus status;
             if (value is Models.ProjectStatus)
             {
+                status = (Models.ProjectStatus) value;
                 return status switch
                 {
-                    Models.ProjectStatus.NotStarted => Colors.Gray,
+                    Models.ProjectStatus.New => Colors.Gray,
                     Models.ProjectStatus.InProgress => Colors.Yellow,
                     Models.ProjectStatus.Completed => Colors.Green,
                     Models.ProjectStatus.OnHold => Colors.Orange,
-                    Models.ProjectStatus.Declined => Colors.Red,
+                    Models.ProjectStatus.Cancelled => Colors.Red,
                     _ => Colors.Gray
                 };
             }

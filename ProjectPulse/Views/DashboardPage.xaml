@@ -140,11 +140,11 @@
                                         EmptyView="Нет предстоящих задач"
                                         HeightRequest="200">
                             <CollectionView.ItemTemplate>
-                                <DataTemplate x:DataType="model:Task">
+                                <DataTemplate x:DataType="model:ProjectTask">
                                     <Grid Padding="15,10" ColumnDefinitions="Auto, *, Auto">
                                         <Border WidthRequest="5"
                                                 HeightRequest="30"
-                                                BackgroundColor="{Binding TaskPulseColor}"
+                                                BackgroundColor="{Binding Color}"
                                                 StrokeShape="RoundRectangle 5,5,5,5" />
                                         
                                         <VerticalStackLayout Grid.Column="1" Spacing="5">
@@ -188,7 +188,7 @@
                                         SelectionChangedCommandParameter="{Binding SelectedItem, Source={RelativeSource Self}}"
                                         EmptyView="Нет просроченных задач">
                             <CollectionView.ItemTemplate>
-                                <DataTemplate x:DataType="model:Task">
+                                <DataTemplate x:DataType="model:ProjectTask">
                                     <Grid Padding="15,10" ColumnDefinitions="Auto, *, Auto">
                                         <Border WidthRequest="5"
                                                 HeightRequest="30"

@@ -43,7 +43,7 @@
                            ReturnCommand="{Binding LoginCommand}" />
                     
                     <Grid ColumnDefinitions="*, Auto">
-                        <CheckBox IsChecked="{Binding RememberMe}"
+                        <CheckBox IsChecked="{Binding IsRememberMe}"
                                   Color="#dc3545" />
                         <Label Text="Запомнить меня"
                                Grid.Column="1"
@@ -57,7 +57,7 @@
                             CornerRadius="5"
                             HeightRequest="50" />
 
-                    <Button Text="Войти с помощью биометрии"
+                    <!--<Button Text="Войти с помощью биометрии"
                             Command="{Binding LoginWithBiometricCommand}"
                             BackgroundColor="#f8f9fa"
                             TextColor="#dc3545"
@@ -65,7 +65,7 @@
                             BorderWidth="1"
                             CornerRadius="5"
                             HeightRequest="50"
-                            IsVisible="{Binding BiometricAvailable}" />
+                            IsVisible="{Binding BiometricAvailable}" />-->
                 </VerticalStackLayout>
             </Border>
             

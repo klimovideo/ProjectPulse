@@ -1,48 +1,58 @@
-using ProjectPulse.Models;
-using ProjectPulse.Database;
-using System;
+﻿using System;
 using System.Collections.Generic;
-using Task = System.Threading.Tasks.Task;
 using System.Linq;
+using System.Threading.Tasks;
+using Microsoft.EntityFrameworkCore;
+using ProjectPulse.Models;
 
 namespace ProjectPulse.Services
 {
+    /// <summary>
+    /// Сервис оповещений, использующий Entity Framework Core вместо локального SQLite‑слоя.
+    /// </summary>
     public class NotificationService
     {
-        private readonly DatabaseService _database;
+        private readonly ProjectPulseContext _db;
 
-        public NotificationService()
+        public NotificationService(ProjectPulseContext dbContext)
         {
-            _database = DatabaseService.Instance;
+            _db = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
         }
 
+        /// <summary>
+        /// Возвращает список уведомлений пользователя, при необходимости фильтруя только непрочитанные.
+        /// </summary>
         public async Task<List<Notification>> GetUserNotificationsAsync(int userId, bool unreadOnly = false)
         {
+            IQueryable<Notification> query = _db.Notifications
+                                                 .Where(n => n.UserId == userId)
+                                                 .OrderByDescending(n => n.CreatedAt);
+
             if (unreadOnly)
-            {
-                return await _database.GetItemsAsync<Notification>(
-                    "SELECT * FROM Notifications WHERE UserId = ? AND ReadAt IS NULL ORDER BY CreatedAt DESC", 
-                    userId);
-            }
-            else
-            {
-                return await _database.GetItemsAsync<Notification>(
-                    "SELECT * FROM Notifications WHERE UserId = ? ORDER BY CreatedAt DESC", 
-                    userId);
-            }
+                query = query.Where(n => n.ReadAt == null);
+
+            return await query.AsNoTracking().ToListAsync();
         }
 
+        /// <summary>
+        /// Подсчитывает непрочитанные уведомления пользователя.
+        /// </summary>
         public async Task<int> GetUnreadNotificationCountAsync(int userId)
         {
-            var notifications = await _database.GetItemsAsync<Notification>(
-                "SELECT COUNT(*) FROM Notifications WHERE UserId = ? AND ReadAt IS NULL", 
-                userId);
-                
-            return notifications.Count;
+            return await _db.Notifications
+                             .Where(n => n.UserId == userId && n.ReadAt == null)
+                             .CountAsync();
         }
 
-        public async Task<bool> CreateNotificationAsync(int userId, string title, string message, 
-            NotificationType type, int relatedEntityId)
+        /// <summary>
+        /// Создаёт новое уведомление и сохраняет его в базе.
+        /// </summary>
+        public async Task<bool> CreateNotificationAsync(
+            int userId,
+            string title,
+            string message,
+            NotificationType type,
+            int? relatedEntityId = null)
         {
             try
             {
@@ -55,109 +65,96 @@ namespace ProjectPulse.Services
                     RelatedEntityId = relatedEntityId,
                     CreatedAt = DateTime.Now
                 };
-                
-                await _database.SaveItemAsync(notification);
+
+                await _db.Notifications.AddAsync(notification);
+                await _db.SaveChangesAsync();
                 return true;
             }
-            catch (Exception)
+            catch
             {
                 return false;
             }
         }
 
+        /// <summary>
+        /// Помечает отдельное уведомление как прочитанное.
+        /// </summary>
         public async Task<bool> MarkNotificationAsReadAsync(int notificationId)
         {
-            try
-            {
-                var notification = await _database.GetItemAsync<Notification>(notificationId);
-                if (notification == null)
-                {
-                    return false;
-                }
-                
-                notification.ReadAt = DateTime.Now;
-                await _database.SaveItemAsync(notification);
-                return true;
-            }
-            catch (Exception)
-            {
+            var notification = await _db.Notifications.FindAsync(notificationId);
+            if (notification == null || notification.ReadAt.HasValue)
                 return false;
-            }
+
+            notification.ReadAt = DateTime.Now;
+            await _db.SaveChangesAsync();
+            return true;
         }
 
+        /// <summary>
+        /// Помечает все непрочитанные уведомления пользователя как прочитанные.
+        /// </summary>
         public async Task<bool> MarkAllNotificationsAsReadAsync(int userId)
         {
-            try
-            {
-                var notifications = await _database.GetItemsAsync<Notification>(
-                    "SELECT * FROM Notifications WHERE UserId = ? AND ReadAt IS NULL", 
-                    userId);
-                    
-                foreach (var notification in notifications)
-                {
-                    notification.ReadAt = DateTime.Now;
-                    await _database.SaveItemAsync(notification);
-                }
-                
-                return true;
-            }
-            catch (Exception)
-            {
+            var notifications = await _db.Notifications
+                                         .Where(n => n.UserId == userId && n.ReadAt == null)
+                                         .ToListAsync();
+
+            if (notifications.Count == 0)
                 return false;
-            }
+
+            foreach (var n in notifications)
+                n.ReadAt = DateTime.Now;
+
+            await _db.SaveChangesAsync();
+            return true;
         }
 
+        /// <summary>
+        /// Удаляет одно уведомление.
+        /// </summary>
         public async Task<bool> DeleteNotificationAsync(int notificationId)
         {
-            try
-            {
-                var notification = await _database.GetItemAsync<Notification>(notificationId);
-                if (notification == null)
-                {
-                    return false;
-                }
-                
-                await _database.DeleteItemAsync(notification);
-                return true;
-            }
-            catch (Exception)
-            {
+            var notification = await _db.Notifications.FindAsync(notificationId);
+            if (notification == null)
                 return false;
-            }
+
+            _db.Notifications.Remove(notification);
+            await _db.SaveChangesAsync();
+            return true;
         }
 
+        /// <summary>
+        /// Полностью очищает историю уведомлений пользователя.
+        /// </summary>
         public async Task<bool> DeleteAllUserNotificationsAsync(int userId)
         {
-            try
-            {
-                var notifications = await _database.GetItemsAsync<Notification>(
-                    "SELECT * FROM Notifications WHERE UserId = ?", 
-                    userId);
-                    
-                foreach (var notification in notifications)
-                {
-                    await _database.DeleteItemAsync(notification);
-                }
-                
-                return true;
-            }
-            catch (Exception)
-            {
+            var notifications = await _db.Notifications
+                                         .Where(n => n.UserId == userId)
+                                         .ToListAsync();
+
+            if (notifications.Count == 0)
                 return false;
-            }
+
+            _db.Notifications.RemoveRange(notifications);
+            await _db.SaveChangesAsync();
+            return true;
         }
 
-        public async Task<List<ProjectTask>> CheckForDueTasksAsync(Guid userId)
+        /// <summary>
+        /// Проверяет задачи, срок выполнения которых истекает в течение суток, создаёт уведомления и возвращает найденные задачи.
+        /// </summary>
+        public async Task<List<ProjectTask>> CheckForDueTasksAsync(int userId)
         {
-            // Get tasks due within the next 24 hours
             var tomorrow = DateTime.Now.AddDays(1);
-            var dueTasks = await _database.GetItemsAsync<ProjectTask>(
-                "SELECT * FROM Tasks WHERE AssignedTo = ? AND DueDate <= ? AND Status != ? AND Status != ?", 
-                userId, tomorrow, (int)ProjectStatus.Completed, (int)ProjectStatus.Cancelled);
+            var dueTasks = await _db.ProjectTasks
+                                     .Where(t => t.AssignedTo == userId &&
+                                                 t.DueDate <= tomorrow &&
+                                                 t.Status != ProjectStatus.Completed &&
+                                                 t.Status != ProjectStatus.Cancelled)
+                                     .ToListAsync();
 
             foreach (var task in dueTasks)
             {
-                // Create notification for each due task
                 await CreateNotificationAsync(
                     userId,
                     "Task Due Soon",
@@ -165,21 +162,25 @@ namespace ProjectPulse.Services
                     NotificationType.TaskDueSoon,
                     task.Id);
             }
-            
+
             return dueTasks;
         }
 
-        public async Task<List<ProjectTask>> CheckForOverdueTasksAsync(Guid userId)
+        /// <summary>
+        /// Проверяет просроченные задачи, создаёт уведомления и возвращает найденные задачи.
+        /// </summary>
+        public async Task<List<ProjectTask>> CheckForOverdueTasksAsync(int userId)
         {
-            // Get overdue tasks
             var now = DateTime.Now;
-            var overdueTasks = await _database.GetItemsAsync<ProjectTask>(
-                "SELECT * FROM Tasks WHERE AssignedTo = ? AND DueDate < ? AND Status != ? AND Status != ?", 
-                userId, now, (int)ProjectStatus.Completed, (int)ProjectStatus.Cancelled);
+            var overdueTasks = await _db.ProjectTasks
+                                         .Where(t => t.AssignedTo == userId &&
+                                                     t.DueDate < now &&
+                                                     t.Status != ProjectStatus.Completed &&
+                                                     t.Status != ProjectStatus.Cancelled)
+                                         .ToListAsync();
 
             foreach (var task in overdueTasks)
             {
-                // Create notification for each overdue task
                 await CreateNotificationAsync(
                     userId,
                     "Task Overdue",
@@ -187,24 +188,29 @@ namespace ProjectPulse.Services
                     NotificationType.TaskOverdue,
                     task.Id);
             }
-            
+
             return overdueTasks;
         }
 
+        /// <summary>
+        /// Создаёт уведомление опроса TeamPulse для каждого участника проекта.
+        /// </summary>
         public async Task CreateTeamPulseSurveyNotificationAsync(int projectId)
         {
-            // Get all team members for this project
-            var userProjects = await _database.GetItemsAsync<UserProject>(
-                "SELECT * FROM UserProjects WHERE ProjectId = ?", projectId);
-                
-            var project = await _database.GetItemAsync<Project>(projectId);
+            var project = await _db.Projects.FindAsync(projectId);
             if (project == null)
                 return;
-                
-            foreach (var userProject in userProjects)
+
+            var userIds = await _db.UserProjects
+                                   .Where(up => up.ProjectId == projectId)
+                                   .Select(up => up.UserId)
+                                   .Distinct()
+                                   .ToListAsync();
+
+            foreach (var uid in userIds)
             {
                 await CreateNotificationAsync(
-                    userProject.UserId,
+                    uid,
                     "Team Pulse Survey",
                     $"Please share your mood for project '{project.Name}'",
                     NotificationType.TeamPulseSurvey,

@@ -74,18 +74,18 @@ namespace ProjectPulse.ViewModels
                 IsBusy = true;
                 ClearError();
 
-                bool result = await _authService.RegisterUserAsync(Username, Email, Password, FirstName, LastName);
-                if (result)
+                var result = await _authService.RegisterUserAsync(Username, Email, Password, firstName + " " + lastName);
+                if (result != null)
                 {
                     // If registration successful, attempt to login
-                    bool loginResult = await _authService.LoginAsync(Username, Password);
+                    var loginResult = await _authService.LoginAsync(Username, Password);
                     
-                    if (loginResult)
+                    if (loginResult != null)
                     {
                         // If biometric auth is enabled, configure it
                         if (UseBiometricAuth)
                         {
-                            await _authService.EnableBiometricAuthAsync(AuthService.CurrentUser.Id);
+                            await _authService.EnableBiometricAuthAsync(_authService.CurrentUser.Id);
                             
                             // Save username to secure storage
                             await SecureStorage.SetAsync("username", Username);

@@ -5,29 +5,42 @@ using System.ComponentModel.DataAnnotations.Schema;
 
 namespace ProjectPulse.Models
 {
-    public class Project
+    public partial class Project
     {
         [Key, DatabaseGenerated(DatabaseGeneratedOption.Identity)]
         public int Id { get; set; }
 
-        [Required, MaxLength(100)] public string Name { get; set; }
-        public string Description  { get; set; }
-        public DateTime StartDate  { get; set; }
-        public DateTime? EndDate   { get; set; }
-        public ProjectStatus Status   { get; set; } = ProjectStatus.New;
-        public ProjectPriority Priority{ get; set; } = ProjectPriority.Medium;
-        public int  CreatedBy     { get; set; }
+        [Required, MaxLength(100)]
+        public string Name { get; set; }
+
+        public string Description { get; set; }
+
+        public DateTime StartDate { get; set; }
+        public DateTime? EndDate { get; set; }
+
+        public ProjectStatus Status { get; set; } = ProjectStatus.New;
+        public ProjectPriority Priority { get; set; } = ProjectPriority.Medium;
+
+        public int CreatedBy { get; set; }
         public DateTime CreatedAt { get; set; } = DateTime.Now;
         public DateTime UpdatedAt { get; set; } = DateTime.Now;
 
-        //-- Навигация
+        // --- навигация ---
         public User Creator { get; set; }
-        public ICollection<ProjectTask> Tasks        { get; set; } = new();
-        public ICollection<UserProject> UserProjects { get; set; } = new();
-        public ICollection<TeamPulse>   TeamPulses   { get; set; } = new();
+
+        public ICollection<ProjectTask> Tasks { get; set; } = new List<ProjectTask>();
+        public ICollection<UserProject> UserProjects { get; set; } = new List<UserProject>();
+        public ICollection<TeamPulse> TeamPulses { get; set; } = new List<TeamPulse>();
     }
 
-    [Table("UserProjects")]
+    public partial class Project
+    {
+        [NotMapped] public int TotalTasks { get; set; }
+        [NotMapped] public int CompletedTasks { get; set; }
+        [NotMapped] public double CompletionPercentage { get; set; }
+    }
+
+
     public class UserProject
     {
         [Key, DatabaseGenerated(DatabaseGeneratedOption.Identity)]
@@ -42,5 +55,5 @@ namespace ProjectPulse.Models
     }
 
     public enum ProjectPriority { Low, Medium, High, Critical }
-    public enum ProjectStatus  { New, Planned, InProgress, OnHold, Blocked, Completed, Cancelled }
+    public enum ProjectStatus  { New, Planned, InProgress, OnHold, Blocked, Completed, Cancelled, Archived }
 }

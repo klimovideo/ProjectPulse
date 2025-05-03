@@ -32,7 +32,7 @@ namespace ProjectPulse.Services
                 if (user == null)
                     return null;
 
-                if (!BCrypt.Verify(password, user.PasswordHash))
+                if (!BCrypt.Net.BCrypt.Verify(password, user.PasswordHash))
                     return null;
 
                 user.LastLogin = DateTime.UtcNow;

@@ -1,7 +1,6 @@
 using Microsoft.Extensions.Logging;
 using CommunityToolkit.Maui;
 using ProjectPulse.Services;
-using ProjectPulse.Database;
 using ProjectPulse.ViewModels;
 using ProjectPulse.Views;
 using ProjectPulse.Helpers;
@@ -39,7 +38,6 @@ public static class MauiProgram
 #endif
 
 		// Register services
-		builder.Services.AddSingleton<DatabaseService>(DatabaseService.Instance);
 		builder.Services.AddSingleton<AuthService>();
 		builder.Services.AddSingleton<NotificationService>();
 		builder.Services.AddSingleton<ProjectService>();
@@ -47,20 +45,20 @@ public static class MauiProgram
 		builder.Services.AddSingleton<CalendarService>();
 		builder.Services.AddSingleton<AIService>();
 
-		// Register ViewModels
+		//// Register ViewModels
 		builder.Services.AddTransient<LoginViewModel>();
 		builder.Services.AddTransient<RegisterViewModel>();
 		builder.Services.AddTransient<DashboardViewModel>();
 		builder.Services.AddTransient<ProjectsViewModel>();
-		builder.Services.AddTransient<ProjectDetailViewModel>();
-		builder.Services.AddTransient<TasksViewModel>();
-		builder.Services.AddTransient<TaskDetailViewModel>();
-		builder.Services.AddTransient<ProfileViewModel>();
-		builder.Services.AddTransient<NotificationsViewModel>();
-		builder.Services.AddTransient<TeamPulseViewModel>();
-		builder.Services.AddTransient<CalendarViewModel>();
+		//builder.Services.AddTransient<ProjectDetailViewModel>();
+		//builder.Services.AddTransient<TasksViewModel>();
+		//builder.Services.AddTransient<TaskDetailViewModel>();
+		//builder.Services.AddTransient<ProfileViewModel>();
+		//builder.Services.AddTransient<NotificationsViewModel>();
+		//builder.Services.AddTransient<TeamPulseViewModel>();
+		//builder.Services.AddTransient<CalendarViewModel>();
 
-		// Register Views
+		//// Register Views
 		builder.Services.AddTransient<LoginPage>();
 		builder.Services.AddTransient<RegisterPage>();
 		builder.Services.AddTransient<DashboardPage>();

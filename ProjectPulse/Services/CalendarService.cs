@@ -52,7 +52,7 @@ namespace ProjectPulse.Services
                     End         = task.DueDate,
                     IsAllDay    = false,
                     Type        = CalendarEventType.Task,
-                    Color       = task.TaskPulseColor
+                    Color       = task.Color
                 });
 
                 // подзадачи (если в модели SubTask есть поле DueDate и TaskPulseColor)

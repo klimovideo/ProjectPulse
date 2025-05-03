@@ -1,15 +1,8 @@
-using System;
-using System.Collections.Generic;
-using System.Text;
-using System.Windows.Input;
 using ProjectPulse.Models;
 using ProjectPulse.Services;
 using ProjectPulse.Views;
-using Microsoft.Maui.Controls;
-using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using Microsoft.Maui.ApplicationModel;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
 
@@ -99,10 +92,10 @@ namespace ProjectPulse.ViewModels
                 ClearError();
 
                 // Set welcome message
-                var currentUser = AuthService.CurrentUser;
+                var currentUser = this._authService.CurrentUser;
                 if (currentUser != null)
                 {
-                    WelcomeMessage = $"Добро пожаловать, {currentUser.FirstName}!";
+                    WelcomeMessage = $"Добро пожаловать, {currentUser.FullName}!";
                 }
 
                 // Get unread notifications count
@@ -111,7 +104,7 @@ namespace ProjectPulse.ViewModels
                 // Load recent projects
                 var projects = await _projectService.GetProjectsByUserAsync(currentUser.Id);
                 var sortedProjects = projects
-                    .OrderByDescending(p => p.ModifiedAt)
+                    .OrderByDescending(p => p.UpdatedAt)
                     .Take(5)
                     .ToList();
 
@@ -202,7 +195,7 @@ namespace ProjectPulse.ViewModels
             try
             {
                 IsBusy = true;
-                await _navigation.PushAsync(new TaskDetailPage(task));
+                //await _navigation.PushAsync(new TaskDetailPage(task));
             }
             catch (Exception ex)
             {

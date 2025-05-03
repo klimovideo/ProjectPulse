@@ -37,9 +37,12 @@ namespace ProjectPulse.Models
         public Project Project       { get; set; }
         public User    AssignedUser  { get; set; }
         public User    Creator       { get; set; }
+        
+        [MaxLength(20)]
+        public string Color { get; set; }
 
-        public ICollection<SubTask> SubTasks { get; set; } = new();
-        public ICollection<Comment> Comments { get; set; } = new();
+        public ICollection<SubTask> SubTasks { get; set; }
+        public ICollection<Comment> Comments { get; set; }
     }
 
     public class SubTask
@@ -58,10 +61,4 @@ namespace ProjectPulse.Models
     }
 
     public enum TaskPriority { Low, Medium, High, Urgent }
-    {
-        Low,
-        Medium,
-        High,
-        Urgent
-    }
 }

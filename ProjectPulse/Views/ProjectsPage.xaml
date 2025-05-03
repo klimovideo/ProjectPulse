@@ -121,15 +121,15 @@
                                                 </Grid>
                                                 
                                                 <Grid ColumnDefinitions="Auto, *" Margin="0,5,0,0">
-                                                    <Label Text="{Binding DueDate, StringFormat='Срок: {0:d MMMM}'}"
+                                                    <Label Text="{Binding EndDate, StringFormat='Срок: {0:d MMMM}'}"
                                                            FontSize="12"
                                                            TextColor="{StaticResource SecondaryTextColor}" />
                                                     
-                                                    <Label Grid.Column="1"
+                                                    <!--<Label Grid.Column="1"
                                                            Text="{Binding TeamMembers.Count, StringFormat='Участников: {0}'}"
                                                            FontSize="12"
                                                            TextColor="{StaticResource SecondaryTextColor}"
-                                                           HorizontalOptions="End" />
+                                                           HorizontalOptions="End" />-->
                                                 </Grid>
                                             </VerticalStackLayout>
                                         </Grid>
@@ -175,7 +175,7 @@
                                                    FontSize="12" />
                                             
                                             <Label Grid.Row="1" Grid.ColumnSpan="2"
-                                                   Text="{Binding CompletedDate, StringFormat='Завершено: {0:d MMMM}'}"
+                                                   Text="{Binding EndDate, StringFormat='Завершено: {0:d MMMM}'}"
                                                    FontSize="12"
                                                    TextColor="{StaticResource SecondaryTextColor}" />
                                         </Grid>
@@ -221,7 +221,7 @@
                                                    FontSize="12" />
                                             
                                             <Label Grid.Row="1" Grid.ColumnSpan="2"
-                                                   Text="{Binding ModifiedAt, StringFormat='Обновлено: {0:d MMMM}'}"
+                                                   Text="{Binding UpdatedAt, StringFormat='Обновлено: {0:d MMMM}'}"
                                                    FontSize="12"
                                                    TextColor="{StaticResource SecondaryTextColor}" />
                                         </Grid>
